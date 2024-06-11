@@ -116,3 +116,60 @@ def calculate_subset_probabilities(P0, Y_nodes):
         subset_probabilities.append(subset_prob)  # Append the subset probability to the list
 
     return results, np.array(subset_probabilities)  # Return results and subset probabilities as a NumPy array
+
+
+def calculate_ccp(X_vals, Y):
+    """
+    Calculate the conditional choice probabilities (CCP) for Y given X.
+
+    Parameters:
+    X_vals (np.ndarray): Array of X values of shape (n, d_X)
+    Y (np.ndarray): Array of Y values of shape (n, d_Y)
+
+    Returns:
+    dict: Conditional frequencies of Y given X
+    np.ndarray: Array of conditional choice probabilities for each unique X value
+    """
+    # Find unique X values
+    unique_x_vals = np.unique(X_vals, axis=0)
+    
+    # Calculate the shape of the Y array
+    d_Y = Y.shape[1]
+    
+    # Initialize an empty list to store the probabilities
+    probabilities = []
+
+    # Initialize a list to store the unique X values in tuple format for later reporting
+    unique_x_list = []
+
+    # Iterate over each unique X value
+    for x in unique_x_vals:
+        # Add the unique X value to the list for reporting
+        unique_x_list.append(tuple(x))
+        
+        # Create a mask to filter rows where X equals the current unique X value
+        mask = (X_vals == x).all(axis=1)
+        
+        # Filter Y values corresponding to the current unique X value
+        y_given_x = Y[mask]
+        
+        # Initialize a dictionary to count occurrences of each Y value as tuples
+        counts = {tuple(y): 0 for y in itertools.product([0, 1], repeat=d_Y)}
+        
+        # Count occurrences of each Y value
+        for y in y_given_x:
+            counts[tuple(y)] += 1
+        
+        # Calculate the total number of occurrences
+        total = sum(counts.values())
+        
+        # Calculate the conditional probabilities
+        ccp = [counts[tuple(y)] / total for y in itertools.product([0, 1], repeat=d_Y)]
+        
+        # Append the CCP to the probabilities list
+        probabilities.append(ccp)
+
+    # Convert the list of probabilities to a NumPy array
+    ccp_array = np.array(probabilities).reshape(-1, len(counts))
+
+    return unique_x_vals, ccp_array
