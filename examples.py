@@ -1,3 +1,4 @@
+import numpy as np
 from scipy.stats import mvn
 
 def calculate_Ftheta_entrygame(X, theta):
