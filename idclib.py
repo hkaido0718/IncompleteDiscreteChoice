@@ -173,3 +173,58 @@ def calculate_ccp(X_vals, Y):
     ccp_array = np.array(probabilities).reshape(-1, len(counts))
 
     return unique_x_vals, ccp_array
+
+
+class BipartiteGraph:
+    def __init__(self, Y_nodes, U_nodes, edges):
+        """
+        Initialize the BipartiteGraph with Y-nodes, U-nodes, and edges.
+
+        Parameters:
+        Y_nodes (list): List of Y-nodes
+        U_nodes (list): List of U-nodes
+        edges (list of tuples): List of directed edges (U_node, Y_node)
+        """
+        self.Y_nodes = Y_nodes
+        self.U_nodes = U_nodes
+        self.B = nx.DiGraph()
+        self.B.add_nodes_from(Y_nodes, bipartite=0)  # Add Y-nodes with bipartite attribute
+        self.B.add_nodes_from(U_nodes, bipartite=1)  # Add U-nodes with bipartite attribute
+        self.B.add_edges_from(edges)  # Add directed edges
+
+
+
+def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
+    Y, X = data
+    Y_nodes = gmodel.Y_nodes
+    U_nodes = gmodel.U_nodes
+    B = gmodel.B
+
+    # Step 1: Compute ccp
+    unique_x_vals, ccp_array = calculate_ccp(X, Y)
+    Nx, Ny = ccp_array.shape
+
+    # Step 2: Compute \(\hat{p}(A|x)\)
+    p_events = []
+    for i in range(Nx):
+        results, subset_probabilities = alculate_subset_probabilities(ccp_array[i], Y_nodes)
+        p_events = np.append(p_events, subset_probabilities)
+
+    # Step 3: Compute Ftheta at \(\theta\)
+    Nu = len(U_nodes)
+    Ftheta = np.zeros((Nx, Nu))
+    for i in range(Nx):
+        Ftheta[i, :] = calculate_Ftheta(unique_x_vals[i, :], theta)
+
+    # Step 4: Compute \(\nu_{\theta}\)
+    nutheta = []
+    for i in range(Nx):
+        results, sharp_lower_bounds = calculate_sharp_lower_bound(Y_nodes, U_nodes, B, Ftheta[i])
+        nutheta = np.append(nutheta, sharp_lower_bounds)
+
+    # Step 5: Compute \(\hat{Q}(\theta)\)
+    difference = nutheta - p_events
+    diff_pos = np.maximum(difference, 0)
+    hatQ = np.max(diff_pos)
+    return hatQ
+
