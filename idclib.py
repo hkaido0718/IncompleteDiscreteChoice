@@ -207,7 +207,7 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     # Step 2: Compute \(\hat{p}(A|x)\)
     p_events = []
     for i in range(Nx):
-        results, subset_probabilities = alculate_subset_probabilities(ccp_array[i], Y_nodes)
+        results, subset_probabilities = calculate_subset_probabilities(ccp_array[i], Y_nodes)
         p_events = np.append(p_events, subset_probabilities)
 
     # Step 3: Compute Ftheta at \(\theta\)
