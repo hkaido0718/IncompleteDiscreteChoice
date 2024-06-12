@@ -177,14 +177,6 @@ def calculate_ccp(X_vals, Y):
 
 class BipartiteGraph:
     def __init__(self, Y_nodes, U_nodes, edges):
-        """
-        Initialize the BipartiteGraph with Y-nodes, U-nodes, and edges.
-
-        Parameters:
-        Y_nodes (list): List of Y-nodes
-        U_nodes (list): List of U-nodes
-        edges (list of tuples): List of directed edges (U_node, Y_node)
-        """
         self.Y_nodes = Y_nodes
         self.U_nodes = U_nodes
         self.B = nx.DiGraph()
@@ -192,6 +184,31 @@ class BipartiteGraph:
         self.B.add_nodes_from(U_nodes, bipartite=1)  # Add U-nodes with bipartite attribute
         self.B.add_edges_from(edges)  # Add directed edges
 
+    def get_exclusive_u_nodes(self, subset_set):
+        exclusive_u_nodes = set()
+        for u_node in [node for node, attr in self.B.nodes(data=True) if attr['bipartite'] == 1]:
+            neighbors = set(self.B.neighbors(u_node))
+            if neighbors.issubset(subset_set):
+                exclusive_u_nodes.add(u_node)
+        return exclusive_u_nodes
+
+    def sum_probabilities(self, exclusive_u_nodes, Ftheta):
+        total_probability = 0.0
+        for u_node in exclusive_u_nodes:
+            index = self.U_nodes.index(u_node)
+            total_probability += Ftheta[index]
+        return total_probability
+
+    def calculate_sharp_lower_bound(self, Ftheta):
+        results = []
+        for r in range(len(self.Y_nodes) + 1):
+            for subset in itertools.combinations(self.Y_nodes, r):
+                subset_set = set(subset)
+                exclusive_u_nodes = self.get_exclusive_u_nodes(subset_set)
+                total_prob = self.sum_probabilities(exclusive_u_nodes, Ftheta)
+                results.append((subset_set, exclusive_u_nodes, total_prob))
+        sharp_lower_bounds = np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
+        return results, sharp_lower_bounds
 
 
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
