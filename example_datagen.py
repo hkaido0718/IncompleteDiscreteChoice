@@ -68,3 +68,50 @@ seed = 123
 # Simulate the values
 X, Y = simulate_y_entrygame(n, rho, beta1, beta2, delta1, delta2, seed=seed)
 np.savez_compressed('./Data/data_entrygame', X=X, Y=Y)
+
+
+
+
+def simulate_y_panel(n, theta, seed=123):
+    np.random.seed(seed)
+    
+    T = 3
+    d = len(theta)  # Dimensionality of theta (should be 2 in this case)
+    
+    # Generate the individual-specific heterogeneity A_i
+    A = np.random.normal(0, 1, n)
+    
+    # Generate the U_it's for each individual
+    U = np.random.multivariate_normal(np.zeros(T), np.identity(T), n)
+    
+    # Initialize X
+    X = np.zeros((n, T, d))
+    
+    # Generate the X_it's for each individual
+    for i in range(n):
+        for t in range(T):
+            p1 = 0.75 if A[i] > 0 else 0.25  # Success probability for the first component
+            X[i, t, 0] = np.random.binomial(1, p1)  # Bernoulli variable for the first component
+            X[i, t, 1] = np.random.choice([-0.5, 0.5])  # Two-point random variable for the second component
+    
+    # Initialize Y
+    Y = np.zeros((n, T), dtype=int)
+    
+    # Calculate Y_it for each individual and time period
+    for i in range(n):
+        for t in range(T):
+            X_it = X[i, t, :]
+            U_it = U[i, t]
+            if np.dot(X_it, theta) + A[i] + U_it >= 0:
+                Y[i, t] = 1
+    
+    # Reshape X to (n, 2*T) for the final output
+    X_reshaped = X.reshape(n, T * d)
+    
+    return X_reshaped, Y
+
+# Example usage
+n = 5000  # Number of individuals
+theta_true = np.array([0.5, 1.0])  # Example values for theta
+X, Y = simulate_y_panel(n, theta_true)
+np.savez_compressed('./Data/data_panel', X=X, Y=Y)
