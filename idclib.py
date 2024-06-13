@@ -131,7 +131,37 @@ class BipartiteGraph:
                 results.append((subset_set, exclusive_u_nodes, total_prob))
         sharp_lower_bounds = np.array([result[2] for result in results]) # np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
         return results, sharp_lower_bounds
+    
+def print_table(results):
+    # Filter results to drop rows with empty exclusive_u_nodes
+    filtered_results = [result for result in results if result[1]]
+    
+    # Calculate the maximum width for each column
+    subset_width = max(len(str(result[0])) for result in filtered_results)
+    exclusive_width = max(len(str(result[1])) for result in filtered_results)
+    lower_bound_width = max(len(f"{result[2]:.2f}") for result in filtered_results)
+    
+    # Define minimum widths for each column
+    min_subset_width = 20
+    min_exclusive_width = 15
+    min_lower_bound_width = 15
 
+    # Adjust widths to be at least the minimum width
+    subset_width = max(subset_width, min_subset_width)
+    exclusive_width = max(exclusive_width, min_exclusive_width)
+    lower_bound_width = max(lower_bound_width, min_lower_bound_width)
+    
+    # Add space between columns
+    column_spacing = 4
+    
+    # Print the header
+    header = f"{'Subset of Y-nodes':<{subset_width + column_spacing}} {'Exclusive U-nodes':<{exclusive_width + column_spacing}} {'Sharp Lower Bound':<{lower_bound_width + column_spacing}}"
+    print(header)
+    print("=" * len(header))
+    
+    # Print the filtered results
+    for subset_set, exclusive_u_nodes, total_prob in filtered_results:
+        print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.2f}")
 
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     Y, X = data
