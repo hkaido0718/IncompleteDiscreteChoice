@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 import networkx as nx
+import matplotlib.pyplot as plt
 
 def calculate_subset_probabilities(P0, Y_nodes):
     """
@@ -131,6 +132,18 @@ class BipartiteGraph:
                 results.append((subset_set, exclusive_u_nodes, total_prob))
         sharp_lower_bounds = np.array([result[2] for result in results]) # np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
         return results, sharp_lower_bounds
+
+    def plot_graph(self, pos, title=''):
+        # Draw the graph
+        plt.figure(figsize=(12, 8))
+        nx.draw(self.B, pos, with_labels=True, labels={node: str(node) for node in self.B.nodes()},
+                node_color=['lightblue'] * len(self.Y_nodes) + ['lightgreen'] * len(self.U_nodes),
+                node_size=2000, font_size=12, font_color='black', edge_color='gray', arrows=True)
+        
+        # Add title and ensure equal aspect ratio
+        plt.title(title)
+        plt.axis('equal')
+        plt.show()
     
 def print_table(results):
     # Filter results to drop rows with empty exclusive_u_nodes
