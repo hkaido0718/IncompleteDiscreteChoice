@@ -87,7 +87,7 @@ def calculate_probabilities(samples, delta12_x_theta, delta13_x_theta, delta23_x
         prob_region6 / n
     )
 
-def calculate_Ftheta(X, theta, num_samples=1000000, random_seed=123):
+def calculate_Ftheta_panel(X, theta, num_samples=1000000, random_seed=123):
     np.random.seed(random_seed)
 
     T = 3
