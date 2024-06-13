@@ -129,7 +129,7 @@ class BipartiteGraph:
                 exclusive_u_nodes = self.get_exclusive_u_nodes(subset_set)
                 total_prob = self.sum_probabilities(exclusive_u_nodes, Ftheta)
                 results.append((subset_set, exclusive_u_nodes, total_prob))
-        sharp_lower_bounds = np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
+        sharp_lower_bounds = np.array([result[2] for result in results]) # np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
         return results, sharp_lower_bounds
 
 
