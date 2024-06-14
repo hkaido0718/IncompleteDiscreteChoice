@@ -153,35 +153,43 @@ def print_table(results):
 
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     Y, X = data
+    n = Y.shape[0]
     Y_nodes = gmodel.Y_nodes
     U_nodes = gmodel.U_nodes
+    if np.unique(X,axis=0).shape[0] == n:
+        X_supp = 'continuous'
+    else:
+        X_supp = np.unique(X,axis=0)
 
     # Step 1: Compute ccp
-    unique_x_vals, ccp_array = calculate_ccp(X, Y)
-    Nx, Ny = ccp_array.shape
+    _,ccp_array = calculate_ccp(Y,X,Y_nodes,X_supp)
 
     # Step 2: Compute \(\hat{p}(A|x)\)
-    p_events = []
-    for i in range(Nx):
-        results, subset_probabilities = calculate_subset_probabilities(ccp_array[i], Y_nodes)
-        p_events = np.append(p_events, subset_probabilities)
+    _, temp = calculate_subset_probabilities(ccp_array[0], Y_nodes)
+    J = len(temp)
+    p_events = np.zeros((n,J))
+    for i in range(n):
+        _, p_events[i,:] = calculate_subset_probabilities(ccp_array[i], Y_nodes)
 
     # Step 3: Compute Ftheta at \(\theta\)
     Nu = len(U_nodes)
-    Ftheta = np.zeros((Nx, Nu))
-    for i in range(Nx):
-        Ftheta[i, :] = calculate_Ftheta(unique_x_vals[i, :], theta)
+    Ftheta = np.zeros((n, Nu))
+    for i in range(n):
+        Ftheta[i, :] = calculate_Ftheta(X[i,:],theta)
 
     # Step 4: Compute \(\nu_{\theta}\)
-    nutheta = []
-    for i in range(Nx):
-        results, sharp_lower_bounds = gmodel.calculate_sharp_lower_bound(Ftheta[i])
-        nutheta = np.append(nutheta, sharp_lower_bounds)
+    nutheta = np.zeros((n,J))
+    for i in range(n):
+        _,nutheta[i,:] = gmodel.calculate_sharp_lower_bound(Ftheta[i])
 
     # Step 5: Compute \(\hat{Q}(\theta)\)
     difference = nutheta - p_events
-    diff_pos = np.maximum(difference, 0)
-    hatQ = np.max(diff_pos)
-    return hatQ
+    if X_supp == 'continuous'
+        meandiff = np.sum(difference,axis=0)/n
+        Qhat = np.sum(np.maximum(meandiff,0))
+    else:
+        diff_pos = np.maximum(difference, 0)
+        Qhat = np.sum(diff_pos)/n
+    return Qhat
 
 
