@@ -184,7 +184,7 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
 
     # Step 5: Compute \(\hat{Q}(\theta)\)
     difference = nutheta - p_events
-    if X_supp == 'continuous'
+    if X_supp == 'continuous':
         meandiff = np.sum(difference,axis=0)/n
         Qhat = np.sum(np.maximum(meandiff,0))
     else:
