@@ -41,61 +41,36 @@ def calculate_subset_probabilities(P0, Y_nodes):
     return results, np.array(subset_probabilities)  # Return results and subset probabilities as a NumPy array
 
 
-def calculate_ccp(X_vals, Y):
-    """
-    Calculate the conditional choice probabilities (CCP) for Y given X.
+def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
+    if isinstance(X_supp, str) and X_supp == 'continuous':
+        unique_X_vals = np.unique(X_vals, axis=0)
+        X_supp = {tuple(x) for x in unique_X_vals}
+    else:
+        X_supp = {tuple(x) for x in X_supp}
 
-    Parameters:
-    X_vals (np.ndarray): Array of X values of shape (n, d_X)
-    Y (np.ndarray): Array of Y values of shape (n, d_Y)
+    count_dict = {x: {y: 0 for y in Y_nodes} for x in X_supp}
+    total_counts = {x: 0 for x in X_supp}
 
-    Returns:
-    dict: Conditional frequencies of Y given X
-    np.ndarray: Array of conditional choice probabilities for each unique X value
-    """
-    # Find unique X values
-    unique_x_vals = np.unique(X_vals, axis=0)
-    
-    # Calculate the shape of the Y array
-    d_Y = Y.shape[1]
-    
-    # Initialize an empty list to store the probabilities
-    probabilities = []
+    for i in range(len(Y)):
+        x = tuple(X_vals[i])
+        if x in count_dict:
+            y = tuple(Y[i])
+            count_dict[x][y] += 1
+            total_counts[x] += 1
 
-    # Initialize a list to store the unique X values in tuple format for later reporting
-    unique_x_list = []
+    prob_dict = {}
+    for x in count_dict:
+        if total_counts[x] > 0:
+            prob_dict[x] = {y: count_dict[x][y] / total_counts[x] for y in count_dict[x]}
+        else:
+            prob_dict[x] = {y: 0 for y in count_dict[x]}
 
-    # Iterate over each unique X value
-    for x in unique_x_vals:
-        # Add the unique X value to the list for reporting
-        unique_x_list.append(tuple(x))
-        
-        # Create a mask to filter rows where X equals the current unique X value
-        mask = (X_vals == x).all(axis=1)
-        
-        # Filter Y values corresponding to the current unique X value
-        y_given_x = Y[mask]
-        
-        # Initialize a dictionary to count occurrences of each Y value as tuples
-        counts = {tuple(y): 0 for y in itertools.product([0, 1], repeat=d_Y)}
-        
-        # Count occurrences of each Y value
-        for y in y_given_x:
-            counts[tuple(y)] += 1
-        
-        # Calculate the total number of occurrences
-        total = sum(counts.values())
-        
-        # Calculate the conditional probabilities
-        ccp = [counts[tuple(y)] / total for y in itertools.product([0, 1], repeat=d_Y)]
-        
-        # Append the CCP to the probabilities list
-        probabilities.append(ccp)
+    ordered_prob_dict = {tuple(X_vals[i]): prob_dict[tuple(X_vals[i])] for i in range(len(X_vals)) if tuple(X_vals[i]) in prob_dict}
 
-    # Convert the list of probabilities to a NumPy array
-    ccp_array = np.array(probabilities).reshape(-1, len(counts))
+    # Create an np.array of conditional probabilities
+    prob_array = np.array([[ordered_prob_dict[tuple(X_vals[i])][y] for y in Y_nodes] for i in range(len(X_vals))])
 
-    return unique_x_vals, ccp_array
+    return ordered_prob_dict, prob_array
 
 
 class BipartiteGraph:
