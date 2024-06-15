@@ -2,7 +2,9 @@ import itertools
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from numba import njit, prange
 
+@njit
 def calculate_subset_probabilities(P0, Y_nodes):
     """
     Calculate the probabilities of all subsets of Y-nodes.
@@ -177,6 +179,7 @@ def print_table(results):
     for subset_set, exclusive_u_nodes, total_prob in filtered_results:
         print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.2f}")
 
+@njit(parallel=True)
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     Y, X = data
     n = Y.shape[0]
@@ -194,18 +197,18 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     _, temp = calculate_subset_probabilities(ccp_array[0], Y_nodes)
     J = len(temp)
     p_events = np.zeros((n,J))
-    for i in range(n):
+    for i in prange(n):
         _, p_events[i,:] = calculate_subset_probabilities(ccp_array[i], Y_nodes)
 
     # Step 3: Compute Ftheta at \(\theta\)
     Nu = len(U_nodes)
     Ftheta = np.zeros((n, Nu))
-    for i in range(n):
+    for i in prange(n):
         Ftheta[i, :] = calculate_Ftheta(X[i,:],theta)
 
     # Step 4: Compute \(\nu_{\theta}\)
     nutheta = np.zeros((n,J))
-    for i in range(n):
+    for i in prange(n):
         _,nutheta[i,:] = gmodel.calculate_sharp_lower_bound(Ftheta[i])
 
     # Step 5: Compute \(\hat{Q}(\theta)\)
