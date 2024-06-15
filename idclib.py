@@ -2,9 +2,8 @@ import itertools
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from numba import njit, prange
+from concurrent.futures import ThreadPoolExecutor
 
-@njit
 def calculate_subset_probabilities(P0, Y_nodes):
     """
     Calculate the probabilities of all subsets of Y-nodes.
@@ -42,7 +41,6 @@ def calculate_subset_probabilities(P0, Y_nodes):
 
     return results, np.array(subset_probabilities)  # Return results and subset probabilities as a NumPy array
 
-@njit
 def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
     if isinstance(X_supp, str) and X_supp == 'continuous':
         unique_X_vals = np.unique(X_vals, axis=0)
@@ -179,46 +177,51 @@ def print_table(results):
     for subset_set, exclusive_u_nodes, total_prob in filtered_results:
         print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.2f}")
 
-@njit(parallel=True)
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     Y, X = data
     n = Y.shape[0]
     Y_nodes = gmodel.Y_nodes
     U_nodes = gmodel.U_nodes
-    if np.unique(X,axis=0).shape[0] == n:
+    if np.unique(X, axis=0).shape[0] == n:
         X_supp = 'continuous'
     else:
-        X_supp = np.unique(X,axis=0)
+        X_supp = np.unique(X, axis=0)
 
     # Step 1: Compute ccp
-    _,ccp_array = calculate_ccp(Y,X,Y_nodes,X_supp)
+    _, ccp_array = calculate_ccp(Y, X, Y_nodes, X_supp)
 
     # Step 2: Compute \(\hat{p}(A|x)\)
-    _, temp = calculate_subset_probabilities(ccp_array[0], Y_nodes)
-    J = len(temp)
-    p_events = np.zeros((n,J))
-    for i in prange(n):
-        _, p_events[i,:] = calculate_subset_probabilities(ccp_array[i], Y_nodes)
+    def compute_p_events(i):
+        _, temp_p_events = calculate_subset_probabilities(ccp_array[i], Y_nodes)
+        return temp_p_events
+
+    with ThreadPoolExecutor() as executor:
+        p_events = np.array(list(executor.map(compute_p_events, range(n))))
 
     # Step 3: Compute Ftheta at \(\theta\)
-    Nu = len(U_nodes)
-    Ftheta = np.zeros((n, Nu))
-    for i in prange(n):
-        Ftheta[i, :] = calculate_Ftheta(X[i,:],theta)
+    def compute_Ftheta(i):
+        return calculate_Ftheta(X[i, :], theta)
+
+    with ThreadPoolExecutor() as executor:
+        Ftheta = np.array(list(executor.map(compute_Ftheta, range(n))))
 
     # Step 4: Compute \(\nu_{\theta}\)
-    nutheta = np.zeros((n,J))
-    for i in prange(n):
-        _,nutheta[i,:] = gmodel.calculate_sharp_lower_bound(Ftheta[i])
+    def compute_nutheta(i):
+        _, temp_nutheta = gmodel.calculate_sharp_lower_bound(Ftheta[i])
+        return temp_nutheta
+
+    with ThreadPoolExecutor() as executor:
+        nutheta = np.array(list(executor.map(compute_nutheta, range(n))))
 
     # Step 5: Compute \(\hat{Q}(\theta)\)
     difference = nutheta - p_events
-    if np.unique(X,axis=0).shape[0] == n:
-        meandiff = np.sum(difference,axis=0)/n
-        Qhat = np.sum(np.maximum(meandiff,0))
+    if np.unique(X, axis=0).shape[0] == n:
+        meandiff = np.sum(difference, axis=0) / n
+        Qhat = np.sum(np.maximum(meandiff, 0))
     else:
         diff_pos = np.maximum(difference, 0)
-        Qhat = np.sum(diff_pos)/n
+        Qhat = np.sum(diff_pos) / n
+
     return Qhat
 
 

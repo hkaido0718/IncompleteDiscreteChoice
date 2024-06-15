@@ -3,7 +3,6 @@ from scipy.stats import mvn
 from scipy.stats import multivariate_normal
 from numba import njit, prange
 
-@njit
 def calculate_Ftheta_entrygame(X, theta):
     
     # Unpack theta
@@ -88,7 +87,6 @@ def calculate_probabilities(samples, delta12_x_theta, delta13_x_theta, delta23_x
         prob_region6 / n
     )
 
-@njit
 def calculate_Ftheta_panel(X, theta, num_samples=1000000, random_seed=123):
     np.random.seed(random_seed)
 
