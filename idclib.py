@@ -42,7 +42,7 @@ def calculate_subset_probabilities(P0, Y_nodes):
 
     return results, np.array(subset_probabilities)  # Return results and subset probabilities as a NumPy array
 
-
+@njit
 def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
     if isinstance(X_supp, str) and X_supp == 'continuous':
         unique_X_vals = np.unique(X_vals, axis=0)
