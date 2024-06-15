@@ -72,6 +72,32 @@ def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
 
     return ordered_prob_dict, prob_array
 
+def split_data(data, seed=None):
+    """
+    Randomly split the data into two halves.
+
+    Parameters:
+    data (np.ndarray): Array containing the data [X, Y] of shape (n, 2)
+    seed (int, optional): Seed for the random number generator
+
+    Returns:
+    tuple: Two numpy arrays representing the two halves of the data
+    """
+    if seed is not None:
+        np.random.seed(seed)
+
+    n = data.shape[0]
+    indices = np.arange(n)
+    np.random.shuffle(indices)
+
+    split_point = n // 2
+    indices_1 = indices[:split_point]
+    indices_2 = indices[split_point:]
+
+    data_1 = data[indices_1]
+    data_2 = data[indices_2]
+
+    return data_1, data_2
 
 class BipartiteGraph:
     def __init__(self, Y_nodes, U_nodes, edges):
