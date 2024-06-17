@@ -10,3 +10,5 @@ This repository collects python libraries for estimating discrete choice models.
 The following Jupyter Notebooks (developed using Google Colab) review the basics of discrete choice models and illustrate how to use the library.
 - `CompleteModel.ipynb`: A review of a binary choice model
 - `IncompleteModel.ipynb`: A review of a two-player discrete game
+- `ModelPrediction.ipynb`: Explains how to represent a DC model as a graph
+- `Inequalities.ipynb`: Explains how to obtain the sharp identifyng restrictions using the `idc` library
