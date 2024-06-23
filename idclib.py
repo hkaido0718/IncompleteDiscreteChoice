@@ -189,28 +189,25 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     n = Y.shape[0]
     Y_nodes = gmodel.Y_nodes
     U_nodes = gmodel.U_nodes
-    if np.unique(X, axis=0).shape[0] == n:
-        X_supp = 'continuous'
-    else:
-        X_supp = np.unique(X, axis=0)
 
     # Step 1: Compute ccp
-    _, ccp_array = calculate_ccp(Y, X, Y_nodes, X_supp)
+    _, ccp_array, Px, X_supp = calculate_ccp(Y, X, Y_nodes)
+    Nx = len(X_supp)
 
     # Step 2: Compute \(\hat{p}(A|x)\)
     def compute_p_events(i):
-        _, temp_p_events = calculate_subset_probabilities(ccp_array[i], Y_nodes)
+        _, temp_p_events = calculate_subset_probabilities(ccp_array[i,:], Y_nodes)
         return temp_p_events
 
     with ThreadPoolExecutor() as executor:
-        p_events = np.array(list(executor.map(compute_p_events, range(n))))
+        p_events = np.array(list(executor.map(compute_p_events, range(Nx))))
 
     # Step 3: Compute Ftheta at \(\theta\)
     def compute_Ftheta(i):
-        return calculate_Ftheta(X[i, :], theta)
+        return calculate_Ftheta(X_supp[i, :], theta)
 
     with ThreadPoolExecutor() as executor:
-        Ftheta = np.array(list(executor.map(compute_Ftheta, range(n))))
+        Ftheta = np.array(list(executor.map(compute_Ftheta, range(Nx))))
 
     # Step 4: Compute \(\nu_{\theta}\)
     def compute_nutheta(i):
@@ -218,7 +215,7 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
         return temp_nutheta
 
     with ThreadPoolExecutor() as executor:
-        nutheta = np.array(list(executor.map(compute_nutheta, range(n))))
+        nutheta = np.array(list(executor.map(compute_nutheta, range(Nx))))
 
     # Step 5: Compute \(\hat{Q}(\theta)\)
     difference = nutheta - p_events
@@ -227,7 +224,9 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
         Qhat = np.sum(np.maximum(meandiff, 0))
     else:
         diff_pos = np.maximum(difference, 0)
-        Qhat = np.sum(diff_pos) / n
+        J = difference.shape[1]
+        w = np.repeat(Px,J).reshape(Nx,J)
+        Qhat = np.sum(w*diff_pos) / n
 
     return Qhat
 
