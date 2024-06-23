@@ -41,12 +41,11 @@ def calculate_subset_probabilities(P0, Y_nodes):
 
     return results, np.array(subset_probabilities)  # Return results and subset probabilities as a NumPy array
 
-def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
-    if isinstance(X_supp, str) and X_supp == 'continuous':
-        unique_X_vals = np.unique(X_vals, axis=0)
-        X_supp = {tuple(x) for x in unique_X_vals}
-    else:
-        X_supp = {tuple(x) for x in X_supp}
+def calculate_ccp(Y, X_vals, Y_nodes):
+    unique_X_vals = np.unique(X_vals, axis=0)
+    is_continuous = len(unique_X_vals) == len(X_vals)
+    
+    X_supp = sorted({tuple(x) for x in unique_X_vals})
 
     count_dict = {x: {y: 0 for y in Y_nodes} for x in X_supp}
     total_counts = {x: 0 for x in X_supp}
@@ -70,7 +69,17 @@ def calculate_ccp(Y, X_vals, Y_nodes, X_supp='continuous'):
     # Create an np.array of conditional probabilities
     prob_array = np.array([[ordered_prob_dict[tuple(X_vals[i])][y] for y in Y_nodes] for i in range(len(X_vals))])
 
-    return ordered_prob_dict, prob_array
+    # Calculate the relative frequencies
+    total_samples = len(Y)
+    relative_frequencies = np.array([total_counts[x] / total_samples for x in X_supp])
+
+    if is_continuous:
+        return ordered_prob_dict, prob_array, relative_frequencies
+    else:
+        rearranged_prob_array = np.array([[prob_dict[x][y] for y in Y_nodes] for x in X_supp])
+        return ordered_prob_dict, rearranged_prob_array, relative_frequencies
+
+
 
 def split_data(data, seed=None):
     """
