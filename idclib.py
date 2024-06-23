@@ -204,7 +204,7 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
 
     # Step 3: Compute Ftheta at \(\theta\)
     def compute_Ftheta(i):
-        return calculate_Ftheta(X_supp[i, :], theta)
+        return calculate_Ftheta(X_supp[i], theta)
 
     with ThreadPoolExecutor() as executor:
         Ftheta = np.array(list(executor.map(compute_Ftheta, range(Nx))))
