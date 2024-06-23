@@ -66,19 +66,17 @@ def calculate_ccp(Y, X_vals, Y_nodes):
 
     ordered_prob_dict = {tuple(X_vals[i]): prob_dict[tuple(X_vals[i])] for i in range(len(X_vals)) if tuple(X_vals[i]) in prob_dict}
 
-    # Create an np.array of conditional probabilities
-    prob_array = np.array([[ordered_prob_dict[tuple(X_vals[i])][y] for y in Y_nodes] for i in range(len(X_vals))])
-
     # Calculate the relative frequencies
     total_samples = len(Y)
     relative_frequencies = np.array([total_counts[x] / total_samples for x in X_supp])
 
     if is_continuous:
-        return ordered_prob_dict, prob_array, relative_frequencies
+        # Create an np.array of conditional probabilities
+        prob_array = np.array([[ordered_prob_dict[tuple(X_vals[i])][y] for y in Y_nodes] for i in range(len(X_vals))])
+        return ordered_prob_dict, prob_array, relative_frequencies, X_vals
     else:
         rearranged_prob_array = np.array([[prob_dict[x][y] for y in Y_nodes] for x in X_supp])
-        return ordered_prob_dict, rearranged_prob_array, relative_frequencies
-
+        return ordered_prob_dict, rearranged_prob_array, relative_frequencies, X_supp
 
 
 def split_data(data, seed=None):
