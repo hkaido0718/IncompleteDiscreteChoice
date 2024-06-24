@@ -1,5 +1,6 @@
 import itertools
 import numpy as np
+import scipy
 import networkx as nx
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
@@ -230,4 +231,79 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
 
     return Qhat
 
+def calculate_p0(theta, data, gmodel, calculate_Ftheta):
+    """
+    Calculate the p0 and nutheta for each unique X value.
+
+    Parameters:
+    theta (np.array): Parameter vector.
+    data (tuple): Tuple containing Y and X arrays.
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
+    calculate_Ftheta (function): Function to calculate Ftheta.
+
+    Returns:
+    tuple: (p_events, nutheta, p0)
+    p_events (list): List of subset probabilities for each unique X value.
+    nutheta (list): List of sharp lower bounds for each unique X value.
+    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+    """
+    Y, X = data
+    Y_nodes = gmodel.Y_nodes
+    U_nodes = gmodel.U_nodes
+    B = gmodel.B
+    tolcon = 1e-4
+
+    # Step 1: Compute ccp
+    ordered_prob_dict, ccp_array, relative_frequencies, X_supp = calculate_ccp(Y,X,Y_nodes)
+    Nx, Ny = ccp_array.shape
+
+    # Step 2: Compute \(\hat{p}(A|x)\)
+    p_events = []
+    for i in range(Nx):
+        results, subset_probabilities = calculate_subset_probabilities(ccp_array[i,:], Y_nodes)
+        p_events = np.append(p_events, subset_probabilities)
+
+    # Step 3: Compute Ftheta at \(\theta\)
+    Nu = len(U_nodes)
+    Ftheta = np.zeros((Nx, Nu))
+    for i in range(Nx):
+        Ftheta[i, :] = calculate_Ftheta(X_supp[i], theta)
+
+    # Step 4: Compute \(\nu_{\theta}\) and find p for each i
+    nutheta = []
+    p0 = []
+    for i in range(Nx):
+        results, sharp_lower_bounds = gmodel.calculate_sharp_lower_bound(Ftheta[i])
+
+        # Append sharp_lower_bounds to nutheta
+        nutheta.append(sharp_lower_bounds)
+
+        # Linear feasibility problem
+        filtered_results = [result for result in results if result[1]]
+        num_rows = len(filtered_results)
+        num_cols = len(Y_nodes)
+        A = np.zeros((num_rows, num_cols), dtype=int)
+        b = np.zeros(num_rows)
+
+        for j, (subset_set, exclusive_u_nodes, total_prob) in enumerate(filtered_results):
+            for k, y_node in enumerate(Y_nodes):
+                if y_node in subset_set:
+                    A[j, k] = 1
+            b[j] = total_prob - tolcon
+
+        # Solve the linear feasibility problem Ax >= b with x in the probability simplex
+        c = np.zeros(num_cols)  # Dummy objective function
+        bounds = [(tolcon, 1-tolcon) for _ in range(num_cols)]  # Encourage interior solutions by setting bounds to be slightly within (0,1)
+
+        A_eq = np.ones((1, num_cols))
+        b_eq = np.array([1])
+
+        res = scipy.optimize.linprog(c, A_ub=-A, b_ub=-b, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
+
+        if res.success:
+            p0.append(res.x)
+        else:
+            print(f"No feasible solution exists for X index {i}.")
+
+    return p_events, nutheta, p0
 
