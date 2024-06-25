@@ -1,5 +1,6 @@
 import itertools
 import numpy as np
+import cvxpy as cp
 import scipy
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -307,3 +308,64 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
 
     return p_events, nutheta, p0
 
+def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
+    """
+    Calculate the qtheta for each unique X value using CVXPY.
+
+    Parameters:
+    theta (np.array): Parameter vector.
+    data (tuple): Tuple containing Y and X arrays.
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
+    calculate_Ftheta (function): Function to calculate Ftheta.
+    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+
+    Returns:
+    list: qtheta for each unique X value.
+    """
+    Y, X = data
+    Y_nodes = gmodel.Y_nodes
+    U_nodes = gmodel.U_nodes
+    B = gmodel.B
+
+    Nx = len(p0)
+    Ny = len(Y_nodes)
+    tolcon = 1e-3
+
+    qtheta = []
+
+    for i in range(Nx):
+        p = p0[i]
+
+        # Setup constraints
+        results, _ = gmodel.calculate_sharp_lower_bound(calculate_Ftheta(X[i], theta))
+        filtered_results = [result for result in results if result[1]]
+        num_rows = len(filtered_results)
+        A = np.zeros((num_rows, Ny), dtype=int)
+        b = np.zeros(num_rows)
+
+        for j, (subset_set, exclusive_u_nodes, total_prob) in enumerate(filtered_results):
+            for k, y_node in enumerate(Y_nodes):
+                if y_node in subset_set:
+                    A[j, k] = 1
+            b[j] = total_prob - tolcon
+
+        # Define the optimization variables and constraints
+        q = cp.Variable(Ny)
+        constraints = [q >= tolcon, q <= 1-tolcon, cp.sum(q) == 1]  # Probability simplex and bounds constraints
+        for j in range(num_rows):
+            constraints.append(A[j, :] @ q >= b[j])
+
+        # Define the objective function
+        objective = cp.Minimize(cp.sum(cp.rel_entr(q + p, q)))
+
+        # Solve the optimization problem
+        prob = cp.Problem(objective, constraints)
+        prob.solve()
+
+        if prob.status == cp.OPTIMAL:
+            qtheta.append(q.value)
+        else:
+            print(f"No feasible solution exists for X index {i}.")
+            qtheta.append(np.zeros(Ny))
+
+    return qtheta
