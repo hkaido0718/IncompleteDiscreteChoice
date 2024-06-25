@@ -374,6 +374,22 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
 
     return qtheta
 
+def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
+    Y, X = data
+    # Compute ccp_array and Px
+    _, ccp_array, Px, _ = calculate_ccp(Y, X, gmodel.Y_nodes)
+
+    Nx,Ny = ccp_array.shape
+
+    # Compute weights w and count
+    n = len(Y)
+    w = np.repeat(Px, Ny).reshape(Nx, Ny)
+    count = n * ccp_array * w
+
+    sumlnL1 = np.sum(np.log(p0)*count)
+    return sumlnL1
+
+
 def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
     """
     Calculate the lnL0 value for the given theta.
