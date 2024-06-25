@@ -256,7 +256,7 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
 
     # Step 1: Obtain X_supp
     _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
-    Nx, _ = len(X_supp)
+    Nx = len(X_supp)
 
 
     # Step 3: Compute Ftheta at \(\theta\)
