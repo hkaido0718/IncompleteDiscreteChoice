@@ -374,6 +374,48 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
 
     return qtheta
 
+def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
+    """
+    Calculate the lnL0 value for the given theta.
+
+    Parameters:
+    theta (np.array): Parameter vector.
+    data (tuple): Tuple containing Y and X arrays.
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
+    calculate_Ftheta (function): Function to calculate Ftheta.
+    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+    truncation_threshold (float): The value at which to truncate lnLR to ensure it stays finite.
+
+    Returns:
+    float: The calculated lnL0 value.
+    """
+    Y, X = data
+    Nx = len(p0)
+    Ny = len(gmodel.Y_nodes)
+
+    # Calculate qtheta
+    qtheta = idc.calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
+
+    # Compute log-likelihood 
+    lnL0 = np.zeros((Nx, Ny))
+    for i in range(Nx):
+          lnL0[i, :] = np.log(qtheta[i])
+          lnL0[i, :] = np.clip(lnL0[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
+
+    # Compute ccp_array, Px, and X_supp
+    _, ccp_array, Px, X_supp = idc.calculate_ccp(Y, X, gmodel.Y_nodes)
+
+    # Compute weights w and count
+    n = len(Y)
+    w = np.repeat(Px, Ny).reshape(Nx, Ny)
+    count = n * ccp_array * w
+
+    # Calculate T
+    sumlnL0 = np.sum(lnL0 * count)
+
+    return sumlnL0
+
+
 def calculate_T(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
     """
     Calculate the T value for the given theta.
@@ -414,6 +456,6 @@ def calculate_T(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=
     count = n * ccp_array * w
 
     # Calculate T
-    T = np.sum(lnLR * count)
+    T = np.exp(np.sum(lnLR * count))
 
     return T
