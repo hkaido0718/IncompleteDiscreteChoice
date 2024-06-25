@@ -255,14 +255,9 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     tolcon = 1e-4
 
     # Step 1: Compute ccp
-    ordered_prob_dict, ccp_array, relative_frequencies, X_supp = calculate_ccp(Y,X,Y_nodes)
-    Nx, Ny = ccp_array.shape
+    _, ccp_array, _, X_supp = calculate_ccp(Y,X,Y_nodes)
+    Nx, _ = ccp_array.shape
 
-    # Step 2: Compute \(\hat{p}(A|x)\)
-    p_events = []
-    for i in range(Nx):
-        results, subset_probabilities = calculate_subset_probabilities(ccp_array[i,:], Y_nodes)
-        p_events = np.append(p_events, subset_probabilities)
 
     # Step 3: Compute Ftheta at \(\theta\)
     Nu = len(U_nodes)
@@ -306,7 +301,7 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
         else:
             print(f"No feasible solution exists for X index {i}.")
 
-    return p_events, nutheta, p0
+    return nutheta, p0
 
 def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     """
