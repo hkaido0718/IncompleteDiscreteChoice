@@ -254,9 +254,9 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     B = gmodel.B
     tolcon = 1e-4
 
-    # Step 1: Compute ccp
-    _, ccp_array, _, X_supp = calculate_ccp(Y,X,Y_nodes)
-    Nx, _ = ccp_array.shape
+    # Step 1: Obtain X_supp
+    _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
+    Nx, _ = len(X_supp)
 
 
     # Step 3: Compute Ftheta at \(\theta\)
