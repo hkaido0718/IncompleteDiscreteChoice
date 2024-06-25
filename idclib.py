@@ -322,9 +322,18 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     U_nodes = gmodel.U_nodes
     B = gmodel.B
 
-    Nx = len(p0)
     Ny = len(Y_nodes)
     tolcon = 1e-3
+
+    # Step 1: Obtain X_supp
+    _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
+    Nx = len(X_supp)
+
+    # Step 3: Compute Ftheta at \(\theta\)
+    Nu = len(U_nodes)
+    Ftheta = np.zeros((Nx, Nu))
+    for i in range(Nx):
+        Ftheta[i, :] = calculate_Ftheta(X_supp[i], theta)
 
     qtheta = []
 
@@ -332,7 +341,7 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
         p = p0[i]
 
         # Setup constraints
-        results, _ = gmodel.calculate_sharp_lower_bound(calculate_Ftheta(X[i], theta))
+        results, _ = gmodel.calculate_sharp_lower_bound(Ftheta[i])
         filtered_results = [result for result in results if result[1]]
         num_rows = len(filtered_results)
         A = np.zeros((num_rows, Ny), dtype=int)
