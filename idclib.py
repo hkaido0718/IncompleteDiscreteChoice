@@ -410,7 +410,7 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     Ny = len(gmodel.Y_nodes)
 
     # Calculate qtheta
-    qtheta = idc.calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
+    qtheta = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
 
     # Compute log-likelihood 
     lnL0 = np.zeros((Nx, Ny))
@@ -419,7 +419,7 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
           lnL0[i, :] = np.clip(lnL0[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
 
     # Compute ccp_array, Px, and X_supp
-    _, ccp_array, Px, X_supp = idc.calculate_ccp(Y, X, gmodel.Y_nodes)
+    _, ccp_array, Px, X_supp = calculate_ccp(Y, X, gmodel.Y_nodes)
 
     # Compute weights w and count
     n = len(Y)
