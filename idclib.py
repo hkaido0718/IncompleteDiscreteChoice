@@ -86,16 +86,18 @@ def split_data(data, seed=None):
     Randomly split the data into two halves.
 
     Parameters:
-    data (np.ndarray): Array containing the data [X, Y] of shape (n, 2)
+    data (list): List containing two arrays [Y, X]
     seed (int, optional): Seed for the random number generator
 
     Returns:
-    tuple: Two numpy arrays representing the two halves of the data
+    tuple: Two lists, each containing two arrays representing the two halves of the data
     """
+    Y, X = data
+    n = Y.shape[0]
+
     if seed is not None:
         np.random.seed(seed)
 
-    n = data.shape[0]
     indices = np.arange(n)
     np.random.shuffle(indices)
 
@@ -103,10 +105,15 @@ def split_data(data, seed=None):
     indices_1 = indices[:split_point]
     indices_2 = indices[split_point:]
 
-    data_1 = data[indices_1]
-    data_2 = data[indices_2]
+    Y0 = Y[indices_1]
+    X0 = X[indices_1]
+    Y1 = Y[indices_2]
+    X1 = X[indices_2]
 
-    return data_1, data_2
+    data0 = [Y0, X0]
+    data1 = [Y1, X1]
+
+    return data0, data1
 
 class BipartiteGraph:
     def __init__(self, Y_nodes, U_nodes, edges):
@@ -375,6 +382,18 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     return qtheta
 
 def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
+    """
+    Calculate the lnL1 value for p0.
+
+    Parameters:
+    data (tuple): Tuple containing Y and X arrays.
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
+    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+    truncation_threshold (float): The value at which to truncate lnLR to ensure it stays finite.
+
+    Returns:
+    float: The calculated lnL1 value.
+    """
     Y, X = data
     # Compute ccp_array and Px
     _, ccp_array, Px, _ = calculate_ccp(Y, X, gmodel.Y_nodes)
