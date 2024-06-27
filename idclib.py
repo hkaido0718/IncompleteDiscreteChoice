@@ -5,6 +5,7 @@ import scipy
 import networkx as nx
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
+from scipy.optimize import differential_evolution, LinearConstraint, NonlinearConstraint
 
 def calculate_subset_probabilities(P0, Y_nodes):
     """
@@ -450,47 +451,96 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
 
     return sumlnL0
 
-
-def calculate_T(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
     """
-    Calculate the T value for the given theta.
+    Calculate the T value for the given parameters.
 
     Parameters:
-    theta (np.array): Parameter vector.
-    data (tuple): Tuple containing Y and X arrays.
-    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
-    calculate_Ftheta (function): Function to calculate Ftheta.
-    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
-    truncation_threshold (float): The value at which to truncate lnLR to ensure it stays finite.
+    data (list): List containing Y and X arrays
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class
+    calculate_Ftheta (function): Function to calculate Ftheta
+    LB (list): Lower bounds for theta
+    UB (list): Upper bounds for theta
+    linear_constraint (LinearConstraint, optional): Linear constraint
+    nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint
+    seed (int, optional): Seed for the random number generator (default is 123)
+    split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit
 
     Returns:
-    float: The calculated T value.
+    float: The calculated T, T^swap, or T^crossfit value
     """
-    Y, X = data
-    Nx = len(p0)
-    Ny = len(gmodel.Y_nodes)
+    # Set the seed for reproducibility
+    np.random.seed(seed)
 
-    # Calculate qtheta
-    qtheta = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
+    # Calculate bounds from LB and UB
+    bounds = [(low, high) for low, high in zip(LB, UB)]
 
-    # Compute log-likelihood ratio lnLR
-    lnLR = np.zeros((Nx, Ny))
-    for i in range(Nx):
-        with np.errstate(divide='ignore', invalid='ignore'):
-            ratio = p0[i] / qtheta[i]
-            ratio = np.where(qtheta[i] == 0, np.inf, ratio)  # Avoid division by zero
-            lnLR[i, :] = np.log(ratio)
-            lnLR[i, :] = np.clip(lnLR[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
+    def calculate_single_T(data0, data1, label):
+        # Step 1: Define the function to minimize for Qhat
+        def objective_function_Qhat(theta):
+            return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
 
-    # Compute ccp_array, Px, and X_supp
-    _, ccp_array, Px, X_supp = calculate_ccp(Y, X, gmodel.Y_nodes)
+        # Perform the optimization for Qhat
+        result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
+        thetahat1 = result.x
+        min_Qhat = result.fun
 
-    # Compute weights w and count
-    n = len(Y)
-    w = np.repeat(Px, Ny).reshape(Nx, Ny)
-    count = n * ccp_array * w
+        print(f"Initial Estimator{label}:", thetahat1)
+        print("Minimum Qhat:", min_Qhat)
 
-    # Calculate T
-    T = np.exp(np.sum(lnLR * count))
+        # Step 2: Calculate p0 and unrestricted log-likelihood
+        _, p0 = calculate_p0(thetahat1, data0, gmodel, calculate_Ftheta)
+        sumlnL1 = calculate_L1(data0, gmodel, p0)
+        print("Unrestricted log-likelihood:", sumlnL1)
 
-    return T
+        # Define the function to minimize for L0
+        def objective_function_L0(theta):
+            return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
+
+        # Callback function to print intermediate results
+        def callback(xk, convergence):
+            print(f"Current Qhat: {objective_function_L0(xk)}")
+            print(f"Convergence: {convergence}")
+
+        # Set the constraints for the optimization
+        constraints = []
+        if linear_constraint is not None:
+            constraints.append(linear_constraint)
+        if nonlinear_constraint is not None:
+            constraints.append(nonlinear_constraint)
+
+        # Perform the optimization for L0
+        result = differential_evolution(
+            objective_function_L0, 
+            bounds, 
+            constraints=constraints, 
+            #callback=callback, 
+            seed=seed
+        )
+        thetahat0 = result.x
+        sumlnL0 = -result.fun
+
+        print(f"RMLE{label}:", thetahat0)
+        print("Restricted log-likelihood:", sumlnL0)
+        T = np.exp(sumlnL1 - sumlnL0)
+        print(f"T{label}:", T)
+        return T
+
+    # Split the data
+    data0, data1 = split_data(data, seed=seed)
+
+    if split == "swap":
+        data0, data1 = data1, data0
+        T_swap = calculate_single_T(data0, data1, "^swap")
+        return T_swap
+
+    elif split == "crossfit":
+        T = calculate_single_T(data0, data1, "")
+        T_swap = calculate_single_T(data1, data0, "^swap")
+        T_crossfit = (T + T_swap) / 2
+        print("T^crossfit:", T_crossfit)
+        return T_crossfit
+
+    else:
+        T = calculate_single_T(data0, data1, "")
+        return T
