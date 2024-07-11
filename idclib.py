@@ -154,7 +154,7 @@ class BipartiteGraph:
     def plot_graph(self, pos=None, title=''):
         # Determine node positions if not provided
         if pos is None:
-            pos = nx.drawing.layout.bipartite_layout(self.B, self.Y_nodes,align='horizontal')
+            pos = nx.drawing.layout.bipartite_layout(self.B, self.U_nodes,align='horizontal')
         
         # Draw the graph
         plt.figure(figsize=(12, 8))
