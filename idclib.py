@@ -151,7 +151,11 @@ class BipartiteGraph:
         sharp_lower_bounds = np.array([result[2] for result in results]) # np.array([result[2] for result in results if result[1]])  # Filter out empty exclusive_u_nodes
         return results, sharp_lower_bounds
 
-    def plot_graph(self, pos, title=''):
+    def plot_graph(self, pos=None, title=''):
+        # Determine node positions if not provided
+        if pos is None:
+            pos = nx.drawing.layout.bipartite_layout(self.B, self.Y_nodes)
+        
         # Draw the graph
         plt.figure(figsize=(12, 8))
         nx.draw(self.B, pos, with_labels=True, labels={node: str(node) for node in self.B.nodes()},
