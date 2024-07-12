@@ -15,4 +15,5 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
 - `HypothesisTests.ipynb`: Explains how to conduct hypothesis tests using universal inference methods.
 - Additional examples
   - `Ex_Panel.ipynb`: Panel binary choice model
-  - `Ex_OrderedChoice.ipynb`: Ordered choice with a set-valued control function  
+  - `Ex_OrderedChoice.ipynb`: Ordered choice with a set-valued control function
+  - `Ex_HeterogeneousChoiceSets.ipynb`: Multinomial choice with heterogeneous choice sets
