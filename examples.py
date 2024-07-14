@@ -3,7 +3,7 @@ from scipy.stats import mvn
 from scipy.stats import multivariate_normal
 from numba import njit, prange
 from scipy.linalg import cholesky
-from scipy.stats import qmc
+from scipy.stats import qmc, norm
 
 def calculate_Ftheta_entrygame(X, theta):
     
@@ -59,11 +59,10 @@ def calculate_Ftheta_entrygame(X, theta):
 def quasi_monte_carlo_quadrature(n_points, mean, cov):
     # Use Sobol sequence for quasi-Monte Carlo
     sobol = qmc.Sobol(d=2, scramble=True)
-    z_points = sobol.random_base2(m=int(np.log2(n_points)))
+    z_points = sobol.random(n_points)
 
     # Convert Sobol points to standard normal using inverse CDF (ppf)
-    z_points = qmc.scale(z_points, mean=[0, 0], scale=[1, 1])
-    z_points = np.array([np.random.normal() for _ in z_points])
+    z_points = norm.ppf(z_points)
     
     # Transform the points using the covariance matrix
     chol_cov = cholesky(cov, lower=True)
