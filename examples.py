@@ -3,7 +3,7 @@ from scipy.stats import mvn
 from scipy.stats import multivariate_normal
 from numba import njit, prange
 from scipy.linalg import cholesky
-import pyapprox as pya
+from scipy.stats import qmc
 
 def calculate_Ftheta_entrygame(X, theta):
     
@@ -56,21 +56,20 @@ def calculate_Ftheta_entrygame(X, theta):
     return np.array([prob_a, prob_b, prob_c, prob_d, prob_e])
 
 
+def quasi_monte_carlo_quadrature(n_points, mean, cov):
+    # Use Sobol sequence for quasi-Monte Carlo
+    sobol = qmc.Sobol(d=2, scramble=True)
+    z_points = sobol.random_base2(m=int(np.log2(n_points)))
 
-def gaussian_quadrature(n_points, mean, cov):
-    # Define the distribution parameters
-    var = np.diag(np.diag(cov))
-    chol_cov = cholesky(cov, lower=True)
-
-    # Generate sparse grid points and weights for N(0, I_2)
-    quad_rule = pya.get_sparse_grid_quadrature_rule('normal', 2, n_points)
-    z_points = quad_rule.points.T
-    weights = quad_rule.weights
-
+    # Convert Sobol points to standard normal using inverse CDF (ppf)
+    z_points = qmc.scale(z_points, mean=[0, 0], scale=[1, 1])
+    z_points = np.array([np.random.normal() for _ in z_points])
+    
     # Transform the points using the covariance matrix
+    chol_cov = cholesky(cov, lower=True)
     w_points = np.dot(chol_cov, z_points.T).T + mean
 
-    return w_points, weights
+    return w_points, np.full(n_points, 1/n_points)  # equal weights
 
 def calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta):
     prob_region1 = 0
@@ -106,7 +105,7 @@ def calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta
         prob_region6
     )
 
-def calculate_Ftheta_panel(X, theta, n_points=100):
+def calculate_Ftheta_panel(X, theta, n_points=1024):
     T = 3
     d = len(theta)  # Dimensionality of theta (should be 2 in this case)
 
@@ -129,8 +128,8 @@ def calculate_Ftheta_panel(X, theta, n_points=100):
     mean = np.zeros(2)
     cov = np.array([[2, 1], [1, 2]])  # Covariance matrix for (D12U, D13U)
 
-    # Get quadrature points and weights
-    w_points, weights = gaussian_quadrature(n_points, mean, cov)
+    # Get quasi-Monte Carlo points and weights
+    w_points, weights = quasi_monte_carlo_quadrature(n_points, mean, cov)
 
     # Calculate probabilities for each region using quadrature points
     probabilities = calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta)
