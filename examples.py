@@ -2,6 +2,8 @@ import numpy as np
 from scipy.stats import mvn
 from scipy.stats import multivariate_normal
 from numba import njit, prange
+from scipy.linalg import cholesky
+import pyapprox as pya
 
 def calculate_Ftheta_entrygame(X, theta):
     
@@ -53,9 +55,24 @@ def calculate_Ftheta_entrygame(X, theta):
     # Return the probabilities as a 5-dimensional array
     return np.array([prob_a, prob_b, prob_c, prob_d, prob_e])
 
-@njit(parallel=True)
-def calculate_probabilities(samples, delta12_x_theta, delta13_x_theta, delta23_x_theta):
-    n = samples.shape[0]
+
+
+def gaussian_quadrature(n_points, mean, cov):
+    # Define the distribution parameters
+    var = np.diag(np.diag(cov))
+    chol_cov = cholesky(cov, lower=True)
+
+    # Generate sparse grid points and weights for N(0, I_2)
+    quad_rule = pya.get_sparse_grid_quadrature_rule('normal', 2, n_points)
+    z_points = quad_rule.points.T
+    weights = quad_rule.weights
+
+    # Transform the points using the covariance matrix
+    w_points = np.dot(chol_cov, z_points.T).T + mean
+
+    return w_points, weights
+
+def calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta):
     prob_region1 = 0
     prob_region2 = 0
     prob_region3 = 0
@@ -63,33 +80,33 @@ def calculate_probabilities(samples, delta12_x_theta, delta13_x_theta, delta23_x
     prob_region5 = 0
     prob_region6 = 0
 
-    for i in prange(n):
-        x0, x1 = samples[i]
+    for i in range(w_points.shape[0]):
+        x0, x1 = w_points[i]
+        weight = weights[i]
+
         if x0 < -delta12_x_theta and x1 < x0 - delta23_x_theta:
-            prob_region1 += 1
+            prob_region1 += weight
         elif x0 > -delta12_x_theta and x1 < -delta13_x_theta:
-            prob_region2 += 1
+            prob_region2 += weight
         elif x1 > -delta13_x_theta and x1 < x0 - delta23_x_theta:
-            prob_region3 += 1
+            prob_region3 += weight
         elif x0 > -delta12_x_theta and x1 > x0 - delta23_x_theta:
-            prob_region4 += 1
+            prob_region4 += weight
         elif x0 < -delta12_x_theta and x1 > -delta13_x_theta:
-            prob_region5 += 1
+            prob_region5 += weight
         elif x1 < -delta13_x_theta and x1 > x0 - delta23_x_theta:
-            prob_region6 += 1
+            prob_region6 += weight
 
     return (
-        prob_region1 / n,
-        prob_region2 / n,
-        prob_region3 / n,
-        prob_region4 / n,
-        prob_region5 / n,
-        prob_region6 / n
+        prob_region1,
+        prob_region2,
+        prob_region3,
+        prob_region4,
+        prob_region5,
+        prob_region6
     )
 
-def calculate_Ftheta_panel(X, theta, num_samples=10000, random_seed=123):
-    np.random.seed(random_seed)
-
+def calculate_Ftheta_panel(X, theta, n_points=100):
     T = 3
     d = len(theta)  # Dimensionality of theta (should be 2 in this case)
 
@@ -109,13 +126,13 @@ def calculate_Ftheta_panel(X, theta, num_samples=10000, random_seed=123):
     delta23_x_theta = x2theta - x3theta
 
     # Define the mean and covariance matrix for the bivariate normal distribution
-    mean = [0, 0]
-    cov = [[2, 1], [1, 2]]  # Covariance matrix for (D12U, D13U)
+    mean = np.zeros(2)
+    cov = np.array([[2, 1], [1, 2]])  # Covariance matrix for (D12U, D13U)
 
-    # Sample points using NumPy multivariate normal
-    samples = np.random.multivariate_normal(mean, cov, size=num_samples)
+    # Get quadrature points and weights
+    w_points, weights = gaussian_quadrature(n_points, mean, cov)
 
-    # Calculate probabilities for each region using Numba
-    probabilities = calculate_probabilities(samples, delta12_x_theta, delta13_x_theta, delta23_x_theta)
+    # Calculate probabilities for each region using quadrature points
+    probabilities = calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta)
 
     return np.array(probabilities)
