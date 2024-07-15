@@ -56,19 +56,10 @@ def calculate_Ftheta_entrygame(X, theta):
     return np.array([prob_a, prob_b, prob_c, prob_d, prob_e])
 
 
-def quasi_monte_carlo_quadrature(n_points, mean, cov):
-    # Use Sobol sequence for quasi-Monte Carlo
-    sobol = qmc.Sobol(d=2, scramble=True)
-    z_points = sobol.random(n_points)
-
-    # Convert Sobol points to standard normal using inverse CDF (ppf)
-    z_points = norm.ppf(z_points)
-    
-    # Transform the points using the covariance matrix
+def transform_points(quadrature_points, mean, cov):
     chol_cov = cholesky(cov, lower=True)
-    w_points = np.dot(chol_cov, z_points.T).T + mean
-
-    return w_points, np.full(n_points, 1/n_points)  # equal weights
+    transformed_points = np.dot(quadrature_points, chol_cov.T) + mean
+    return transformed_points
 
 def calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta):
     prob_region1 = 0
@@ -104,7 +95,7 @@ def calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta
         prob_region6
     )
 
-def calculate_Ftheta_panel(X, theta, n_points=1024):
+def calculate_Ftheta_panel(X, theta):
     T = 3
     d = len(theta)  # Dimensionality of theta (should be 2 in this case)
 
@@ -127,8 +118,13 @@ def calculate_Ftheta_panel(X, theta, n_points=1024):
     mean = np.zeros(2)
     cov = np.array([[2, 1], [1, 2]])  # Covariance matrix for (D12U, D13U)
 
-    # Get quasi-Monte Carlo points and weights
-    w_points, weights = quasi_monte_carlo_quadrature(n_points, mean, cov)
+    # Load quadrature points and weights from file
+    data = np.loadtxt('./data/gaussian_quadrature_data.txt', delimiter=',')
+    quadrature_points = data[:, :2]
+    weights = data[:, 2]
+
+    # Transform points
+    w_points = transform_points(quadrature_points, mean, cov)
 
     # Calculate probabilities for each region using quadrature points
     probabilities = calculate_probabilities_quadrature(w_points, weights, delta12_x_theta, delta13_x_theta, delta23_x_theta)
