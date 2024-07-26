@@ -9,7 +9,7 @@ This repository collects Python libraries to estimate discrete choice models. Cu
 
 Depending on your environment, you may need to install the following modules.
 - CVXPY (https://www.cvxpy.org/install/): A module for convex optimization. Installation: `pip install cvxpy`
-- down (https://pypi.org/project/gdown/): A module for downloading files from Google Drive. Installation: `pip install gdown`
+- gdown (https://pypi.org/project/gdown/): A module for downloading files from Google Drive. Installation: `pip install gdown`
 
 # Tutorials
 
