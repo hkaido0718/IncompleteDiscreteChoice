@@ -15,11 +15,11 @@ Depending on your environment, you may need to install the following modules.
 
 The following Jupyter Notebooks (developed using Google Colab) review the basics of discrete choice models and illustrate how to use the library.
 - [`CompleteModel.ipynb`](./CompleteModel.ipynb): A review of a binary choice model;
-- `IncompleteModel.ipynb`: A review of a two-player discrete game;
-- `ModelPrediction.ipynb`: Explains how to represent a DC model as a graph;
-- `Inequalities.ipynb`: Explains how to obtain the sharp identifying restrictions using the `idc` library;
-- `HypothesisTests.ipynb`: Explains how to conduct hypothesis tests using universal inference methods.
+- [`IncompleteModel.ipynb`](./IncompleteModel.ipynb): A review of a two-player discrete game;
+- [`ModelPrediction.ipynb`](./ModelPrediction.ipynb): Explains how to represent a DC model as a graph;
+- [`Inequalities.ipynb`](./Inequalities.ipynb): Explains how to obtain the sharp identifying restrictions using the `idc` library;
+- [`HypothesisTests.ipynb`](./HypothesisTests.ipynb): Explains how to conduct hypothesis tests using universal inference methods.
 - Additional examples
-  - `Ex_Panel.ipynb`: Panel binary choice model
-  - `Ex_OrderedChoice.ipynb`: Ordered choice with a set-valued control function
-  - `Ex_HeterogeneousChoiceSets.ipynb`: Multinomial choice with heterogeneous choice sets
+  - [`Ex_Panel.ipynb`](./Ex_Panel.ipynb): Panel binary choice model
+  - [`Ex_OrderedChoice.ipynb`](./Ex_OrderedChoice.ipynb): Ordered choice with a set-valued control function
+  - [`Ex_HeterogeneousChoiceSets.ipynb`](./Ex_HeterogeneousChoiceSets.ipynb): Multinomial choice with heterogeneous choice sets
