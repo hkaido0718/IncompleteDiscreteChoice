@@ -1,4 +1,4 @@
-# Python Libraries for Incomplete Discrete Choice (IDC) Models
+# A Python Library for Incomplete Discrete Choice (IDC) Models
 
 This repository collects Python libraries to estimate discrete choice models. Currently, it contains the following files.
 
