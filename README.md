@@ -18,7 +18,7 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
 - [`IncompleteModel.ipynb`](./IncompleteModel.ipynb): A review of a two-player discrete game;
 - [`ModelPrediction.ipynb`](./ModelPrediction.ipynb): Explains how to represent a DC model as a graph;
 - [`Inequalities.ipynb`](./Inequalities.ipynb): Explains how to obtain the sharp identifying restrictions using the `idc` library;
-- [`IdentifiedSet.ipynb`](./IdentifiedSet.ipynb): Illustrates how to compute the projections of the sharp identified set;
+- [`IdentifiedSet.ipynb`](./IdentifiedSet.ipynb): Illustrates how to compute the projections of a sharp identified set;
 - [`HypothesisTests.ipynb`](./HypothesisTests.ipynb): Explains how to conduct hypothesis tests using universal inference methods.
 - Additional examples
   - [`Ex_Panel.ipynb`](./Ex_Panel.ipynb): Panel binary choice model
