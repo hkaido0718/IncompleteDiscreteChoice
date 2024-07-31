@@ -196,7 +196,7 @@ def print_table(results):
     
     # Print the filtered results
     for subset_set, exclusive_u_nodes, total_prob in filtered_results:
-        print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.2f}")
+        print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.3f}")
 
 def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
     Y, X = data
