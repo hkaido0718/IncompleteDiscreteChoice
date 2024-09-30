@@ -264,7 +264,7 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     Y_nodes = gmodel.Y_nodes
     U_nodes = gmodel.U_nodes
     B = gmodel.B
-    tolcon = 1e-4
+    tolcon = 1e-3
 
     # Step 1: Obtain X_supp
     _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
@@ -312,7 +312,6 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
             p0.append(res.x)
         else:
             print(f"No feasible solution exists for X index {i}.")
-
     return nutheta, p0
 
 def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
