@@ -455,40 +455,55 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
 
     return sumlnL0
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
+from scipy.optimize import differential_evolution, LinearConstraint, NonlinearConstraint
+from skopt import gp_minimize
+from skopt.space import Real
+from skopt.utils import use_named_args
+import numpy as np
+
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
     """
-    Calculate the T value for the given parameters.
+    Calculate the T value for the given parameters using either differential evolution (with constraints) or Bayesian optimization (with penalty).
 
     Parameters:
-    data (list): List containing Y and X arrays
-    gmodel (BipartiteGraph): Instance of the BipartiteGraph class
-    calculate_Ftheta (function): Function to calculate Ftheta
-    LB (list): Lower bounds for theta
-    UB (list): Upper bounds for theta
-    linear_constraint (LinearConstraint, optional): Linear constraint
-    nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint
-    seed (int, optional): Seed for the random number generator (default is 123)
-    split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit
+    data (list): List containing Y and X arrays.
+    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
+    calculate_Ftheta (function): Function to calculate Ftheta.
+    LB (list): Lower bounds for theta.
+    UB (list): Upper bounds for theta.
+    method (str): Optimization method ('differential_evolution' or 'bayesian').
+    linear_constraint (LinearConstraint, optional): Linear constraint.
+    nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint.
+    seed (int, optional): Seed for the random number generator (default is 123).
+    split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit.
 
     Returns:
-    float: The calculated T, T^swap, or T^crossfit value
+    float: The calculated T, T^swap, or T^crossfit value.
     """
-    # Set the seed for reproducibility
     np.random.seed(seed)
-
-    # Calculate bounds from LB and UB
     bounds = [(low, high) for low, high in zip(LB, UB)]
 
     def calculate_single_T(data0, data1, label):
-        # Step 1: Define the function to minimize for Qhat
+        # Step 1: Define the function to minimize for Qhat (only bounds apply here)
         def objective_function_Qhat(theta):
             return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
 
-        # Perform the optimization for Qhat
-        result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
+        if method == 'differential_evolution':
+            # Perform the optimization for Qhat using differential evolution (bounds only)
+            result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
+
+        elif method == 'bayesian':
+            # Define the space for Bayesian optimization (bounds only)
+            space = [Real(low, high) for low, high in zip(LB, UB)]
+
+            @use_named_args(space)
+            def bayesian_objective_function_Qhat(*theta):
+                return objective_function_Qhat(np.array(theta))
+
+            result = gp_minimize(bayesian_objective_function_Qhat, space, random_state=seed)
+
         thetahat1 = result.x
         min_Qhat = result.fun
-
         print(f"Initial Estimator{label}:", thetahat1)
         print("Minimum Qhat:", min_Qhat)
 
@@ -497,33 +512,38 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, linear_constraint=None,
         sumlnL1 = calculate_L1(data0, gmodel, p0)
         print("Unrestricted log-likelihood:", sumlnL1)
 
-        # Define the function to minimize for L0
+        # Define the function to minimize for L0 (apply bounds and constraints here)
         def objective_function_L0(theta):
             return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
 
-        # Callback function to print intermediate results
-        def callback(xk, convergence):
-            print(f"Current Qhat: {objective_function_L0(xk)}")
-            print(f"Convergence: {convergence}")
+        if method == 'differential_evolution':
+            # Constraints and bounds applied during L0 optimization with differential evolution
+            constraints = []
+            if linear_constraint is not None:
+                constraints.append(linear_constraint)
+            if nonlinear_constraint is not None:
+                constraints.append(nonlinear_constraint)
 
-        # Set the constraints for the optimization
-        constraints = []
-        if linear_constraint is not None:
-            constraints.append(linear_constraint)
-        if nonlinear_constraint is not None:
-            constraints.append(nonlinear_constraint)
+            result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
 
-        # Perform the optimization for L0
-        result = differential_evolution(
-            objective_function_L0, 
-            bounds, 
-            constraints=constraints, 
-            #callback=callback, 
-            seed=seed
-        )
+        elif method == 'bayesian':
+            @use_named_args(space)
+            def bayesian_objective_function_L0(*theta):
+                penalty = 0
+                # Apply penalties for constraint violations
+                if linear_constraint is not None:
+                    A, b = linear_constraint.A, linear_constraint.lb
+                    penalty += np.sum(np.maximum(np.dot(A, theta) - b, 0))
+
+                if nonlinear_constraint is not None:
+                    penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta) - nonlinear_constraint.ub, 0))
+
+                return objective_function_L0(np.array(theta)) + penalty
+
+            result = gp_minimize(bayesian_objective_function_L0, space, random_state=seed)
+
         thetahat0 = result.x
         sumlnL0 = -result.fun
-
         print(f"RMLE{label}:", thetahat0)
         print("Restricted log-likelihood:", sumlnL0)
         T = np.exp(sumlnL1 - sumlnL0)
