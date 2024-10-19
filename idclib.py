@@ -493,12 +493,15 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
             result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
 
         elif method == 'bayesian':
-            # Define the space for Bayesian optimization (bounds only)
-            space = [Real(low, high) for low, high in zip(LB, UB)]
+            # Define the space for Bayesian optimization with named dimensions
+            space = [
+                Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))
+            ]
 
             @use_named_args(space)
-            def bayesian_objective_function_Qhat(*theta):
-                return objective_function_Qhat(np.array(theta))
+            def bayesian_objective_function_Qhat(**theta):
+                theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
+                return objective_function_Qhat(theta_values)
 
             result = gp_minimize(bayesian_objective_function_Qhat, space, random_state=seed)
 
@@ -528,17 +531,18 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
 
         elif method == 'bayesian':
             @use_named_args(space)
-            def bayesian_objective_function_L0(*theta):
+            def bayesian_objective_function_L0(**theta):
+                theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
                 penalty = 0
                 # Apply penalties for constraint violations
                 if linear_constraint is not None:
                     A, b = linear_constraint.A, linear_constraint.lb
-                    penalty += np.sum(np.maximum(np.dot(A, theta) - b, 0))
+                    penalty += np.sum(np.maximum(np.dot(A, theta_values) - b, 0))
 
                 if nonlinear_constraint is not None:
-                    penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta) - nonlinear_constraint.ub, 0))
+                    penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta_values) - nonlinear_constraint.ub, 0))
 
-                return objective_function_L0(np.array(theta)) + penalty
+                return objective_function_L0(theta_values) + penalty
 
             result = gp_minimize(bayesian_objective_function_L0, space, random_state=seed)
 
