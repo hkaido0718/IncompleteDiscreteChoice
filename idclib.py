@@ -454,7 +454,6 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     sumlnL0 = np.sum(lnL0 * count)
 
     return sumlnL0
-
 from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
 from skopt import gp_minimize
 from skopt.space import Real
@@ -500,7 +499,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
         
         return linear_satisfied and nonlinear_satisfied
 
-    def optimize_L0(thetahat1):
+    def optimize_L0(thetahat1, objective_function_L0):
         """Optimize L0 with retries if constraints are violated."""
         retries = 0
         while retries < max_retries:
@@ -591,7 +590,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
             return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
 
         # Optimize L0 and check constraints
-        thetahat0, sumlnL0 = optimize_L0(thetahat1)
+        thetahat0, sumlnL0 = optimize_L0(thetahat1, objective_function_L0)
 
         print(f"RMLE{label}:", thetahat0)
         print("Restricted log-likelihood:", sumlnL0)
