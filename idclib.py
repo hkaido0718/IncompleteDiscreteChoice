@@ -461,9 +461,10 @@ from skopt.space import Real
 from skopt.utils import use_named_args
 import numpy as np
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='slsqp', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='slsqp', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None, max_retries=3):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
+    If constraints are violated, retry optimization with the same or alternative methods.
 
     Parameters:
     data (list): List containing Y and X arrays.
@@ -477,12 +478,83 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
     nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint.
     seed (int, optional): Seed for the random number generator (default is 123).
     split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit.
+    max_retries (int, optional): Maximum number of retries if constraints are violated.
 
     Returns:
     float: The calculated T, T^swap, or T^crossfit value.
     """
     np.random.seed(seed)
     bounds = [(low, high) for low, high in zip(LB, UB)]
+
+    def check_constraints(thetahat, linear_constraint, nonlinear_constraint):
+        """Check if the current solution satisfies all constraints."""
+        linear_satisfied = True
+        nonlinear_satisfied = True
+        
+        if linear_constraint is not None:
+            A, lb = linear_constraint.A, linear_constraint.lb
+            linear_satisfied = np.all(np.dot(A, thetahat) >= lb)
+
+        if nonlinear_constraint is not None:
+            nonlinear_satisfied = np.all(nonlinear_constraint.fun(thetahat) <= nonlinear_constraint.ub)
+        
+        return linear_satisfied and nonlinear_satisfied
+
+    def optimize_L0(thetahat1):
+        """Optimize L0 with retries if constraints are violated."""
+        retries = 0
+        while retries < max_retries:
+            # Optimizing L0
+            if method_L0 == 'differential_evolution':
+                # Constraints and bounds applied during L0 optimization with differential evolution
+                constraints = []
+                if linear_constraint is not None:
+                    constraints.append(linear_constraint)
+                if nonlinear_constraint is not None:
+                    constraints.append(nonlinear_constraint)
+
+                result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
+
+            elif method_L0 == 'slsqp':
+                # Use SLSQP for L0 optimization
+                constraints = []
+                if linear_constraint is not None:
+                    constraints.append({'type': 'ineq', 'fun': lambda x: np.dot(linear_constraint.A, x) - linear_constraint.lb})
+                if nonlinear_constraint is not None:
+                    constraints.append({'type': 'ineq', 'fun': nonlinear_constraint.fun})
+
+                result = minimize(objective_function_L0, thetahat1, method='SLSQP', bounds=bounds, constraints=constraints)
+
+            elif method_L0 == 'bayesian':
+                @use_named_args(space)
+                def bayesian_objective_function_L0(**theta):
+                    theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
+                    penalty = 0
+                    
+                    # Apply penalties for linear constraint violations
+                    if linear_constraint is not None:
+                        A = linear_constraint.A
+                        lb = linear_constraint.lb
+                        penalty += np.sum(np.maximum(np.dot(A, theta_values) - lb, 0))
+
+                    # Apply penalties for nonlinear constraint violations
+                    if nonlinear_constraint is not None:
+                        penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta_values) - nonlinear_constraint.ub, 0))
+
+                    return objective_function_L0(theta_values) + penalty
+
+                result = gp_minimize(bayesian_objective_function_L0, space, random_state=seed)
+
+            thetahat0 = result.x
+
+            # Check if the solution satisfies constraints
+            if check_constraints(thetahat0, linear_constraint, nonlinear_constraint):
+                return thetahat0, -result.fun  # Return feasible solution
+
+            print(f"Retrying L0 optimization (Attempt {retries + 1}/{max_retries})")
+            retries += 1
+
+        raise ValueError("Optimization failed to satisfy constraints after maximum retries.")
 
     def calculate_single_T(data0, data1, label):
         # Step 1: Define the function to minimize for Qhat (only bounds apply here)
@@ -518,65 +590,8 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
         def objective_function_L0(theta):
             return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
 
-        # Optimizing L0
-        if method_L0 == 'differential_evolution':
-            # Constraints and bounds applied during L0 optimization with differential evolution
-            constraints = []
-            if linear_constraint is not None:
-                constraints.append(linear_constraint)
-            if nonlinear_constraint is not None:
-                constraints.append(nonlinear_constraint)
-
-            result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
-
-        elif method_L0 == 'slsqp':
-            # Use SLSQP for L0 optimization
-            constraints = []
-            if linear_constraint is not None:
-                constraints.append({'type': 'ineq', 'fun': lambda x: np.dot(linear_constraint.A, x) - linear_constraint.lb})
-            if nonlinear_constraint is not None:
-                constraints.append({'type': 'ineq', 'fun': nonlinear_constraint.fun})
-
-            result = minimize(objective_function_L0, thetahat1, method='SLSQP', bounds=bounds, constraints=constraints)
-
-        elif method_L0 == 'bayesian':
-            @use_named_args(space)
-            def bayesian_objective_function_L0(**theta):
-                theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
-                penalty = 0
-                
-                # Apply penalties for linear constraint violations
-                if linear_constraint is not None:
-                    A = linear_constraint.A
-                    lb = linear_constraint.lb
-                    penalty += np.sum(np.maximum(np.dot(A, theta_values) - lb, 0))
-
-                # Apply penalties for nonlinear constraint violations
-                if nonlinear_constraint is not None:
-                    penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta_values) - nonlinear_constraint.ub, 0))
-
-                return objective_function_L0(theta_values) + penalty
-
-            result = gp_minimize(bayesian_objective_function_L0, space, random_state=seed)
-
-        # Ensure constraints are satisfied post-optimization
-        thetahat0 = result.x
-        
-        # Check and enforce linear constraints
-        if linear_constraint is not None:
-            A, lb = linear_constraint.A, linear_constraint.lb
-            if not np.all(np.dot(A, thetahat0) >= lb):
-                print("Linear constraints violated. Adjusting solution.")
-                thetahat0 = np.clip(thetahat0, LB, UB)  # Re-adjust if constraints are violated
-
-        # Check and enforce nonlinear constraints
-        if nonlinear_constraint is not None:
-            if not np.all(nonlinear_constraint.fun(thetahat0) <= nonlinear_constraint.ub):
-                print("Nonlinear constraints violated. Adjusting solution.")
-                thetahat0 = np.clip(thetahat0, LB, UB)  # Re-adjust if constraints are violated
-
-        # Re-evaluate L0 at the adjusted solution
-        sumlnL0 = -calculate_L0(thetahat0, data0, gmodel, calculate_Ftheta, p0)
+        # Optimize L0 and check constraints
+        thetahat0, sumlnL0 = optimize_L0(thetahat1)
 
         print(f"RMLE{label}:", thetahat0)
         print("Restricted log-likelihood:", sumlnL0)
