@@ -461,9 +461,10 @@ from skopt.space import Real
 from skopt.utils import use_named_args
 import numpy as np
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
+
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
     """
-    Calculate the T value for the given parameters using either differential evolution (with constraints) or Bayesian optimization (with penalty).
+    Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
 
     Parameters:
     data (list): List containing Y and X arrays.
@@ -471,7 +472,8 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
     calculate_Ftheta (function): Function to calculate Ftheta.
     LB (list): Lower bounds for theta.
     UB (list): Upper bounds for theta.
-    method (str): Optimization method ('differential_evolution' or 'bayesian').
+    method_Qhat (str): Optimization method for Qhat ('differential_evolution' or 'bayesian').
+    method_L0 (str): Optimization method for L0 ('differential_evolution' or 'bayesian').
     linear_constraint (LinearConstraint, optional): Linear constraint.
     nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint.
     seed (int, optional): Seed for the random number generator (default is 123).
@@ -488,15 +490,13 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
         def objective_function_Qhat(theta):
             return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
 
-        if method == 'differential_evolution':
-            # Perform the optimization for Qhat using differential evolution (bounds only)
+        # Optimizing Qhat
+        if method_Qhat == 'differential_evolution':
             result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
 
-        elif method == 'bayesian':
+        elif method_Qhat == 'bayesian':
             # Define the space for Bayesian optimization with named dimensions
-            space = [
-                Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))
-            ]
+            space = [Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))]
 
             @use_named_args(space)
             def bayesian_objective_function_Qhat(**theta):
@@ -515,11 +515,12 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
         sumlnL1 = calculate_L1(data0, gmodel, p0)
         print("Unrestricted log-likelihood:", sumlnL1)
 
-        # Define the function to minimize for L0 (apply bounds and constraints here)
+        # Step 3: Define the function to minimize for L0 (apply bounds and constraints here)
         def objective_function_L0(theta):
             return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
 
-        if method == 'differential_evolution':
+        # Optimizing L0
+        if method_L0 == 'differential_evolution':
             # Constraints and bounds applied during L0 optimization with differential evolution
             constraints = []
             if linear_constraint is not None:
@@ -529,7 +530,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
 
             result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
 
-        elif method == 'bayesian':
+        elif method_L0 == 'bayesian':
             @use_named_args(space)
             def bayesian_objective_function_L0(**theta):
                 theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
