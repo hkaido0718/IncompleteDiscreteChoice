@@ -461,8 +461,6 @@ from skopt.space import Real
 from skopt.utils import use_named_args
 import numpy as np
 
-
-
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='slsqp', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
@@ -561,8 +559,25 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
 
             result = gp_minimize(bayesian_objective_function_L0, space, random_state=seed)
 
+        # Ensure constraints are satisfied post-optimization
         thetahat0 = result.x
-        sumlnL0 = -result.fun
+        
+        # Check and enforce linear constraints
+        if linear_constraint is not None:
+            A, lb = linear_constraint.A, linear_constraint.lb
+            if not np.all(np.dot(A, thetahat0) >= lb):
+                print("Linear constraints violated. Adjusting solution.")
+                thetahat0 = np.clip(thetahat0, LB, UB)  # Re-adjust if constraints are violated
+
+        # Check and enforce nonlinear constraints
+        if nonlinear_constraint is not None:
+            if not np.all(nonlinear_constraint.fun(thetahat0) <= nonlinear_constraint.ub):
+                print("Nonlinear constraints violated. Adjusting solution.")
+                thetahat0 = np.clip(thetahat0, LB, UB)  # Re-adjust if constraints are violated
+
+        # Re-evaluate L0 at the adjusted solution
+        sumlnL0 = -calculate_L0(thetahat0, data0, gmodel, calculate_Ftheta, p0)
+
         print(f"RMLE{label}:", thetahat0)
         print("Restricted log-likelihood:", sumlnL0)
         T = np.exp(sumlnL1 - sumlnL0)
