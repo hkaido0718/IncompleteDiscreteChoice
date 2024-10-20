@@ -455,14 +455,15 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
 
     return sumlnL0
 
-from scipy.optimize import differential_evolution, LinearConstraint, NonlinearConstraint
+from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
 from skopt import gp_minimize
 from skopt.space import Real
 from skopt.utils import use_named_args
 import numpy as np
 
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
+
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='slsqp', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
 
@@ -473,7 +474,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
     LB (list): Lower bounds for theta.
     UB (list): Upper bounds for theta.
     method_Qhat (str): Optimization method for Qhat ('differential_evolution' or 'bayesian').
-    method_L0 (str): Optimization method for L0 ('differential_evolution' or 'bayesian').
+    method_L0 (str): Optimization method for L0 ('differential_evolution', 'slsqp', or 'bayesian').
     linear_constraint (LinearConstraint, optional): Linear constraint.
     nonlinear_constraint (NonlinearConstraint, optional): Nonlinear constraint.
     seed (int, optional): Seed for the random number generator (default is 123).
@@ -529,6 +530,16 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
                 constraints.append(nonlinear_constraint)
 
             result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
+
+        elif method_L0 == 'slsqp':
+            # Use SLSQP for L0 optimization
+            constraints = []
+            if linear_constraint is not None:
+                constraints.append({'type': 'ineq', 'fun': lambda x: np.dot(linear_constraint.A, x) - linear_constraint.lb})
+            if nonlinear_constraint is not None:
+                constraints.append({'type': 'ineq', 'fun': nonlinear_constraint.fun})
+
+            result = minimize(objective_function_L0, thetahat1, method='SLSQP', bounds=bounds, constraints=constraints)
 
         elif method_L0 == 'bayesian':
             @use_named_args(space)
