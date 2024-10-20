@@ -414,53 +414,13 @@ def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
     return sumlnL1
 
 
-def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
-    """
-    Calculate the lnL0 value for the given theta.
-
-    Parameters:
-    theta (np.array): Parameter vector.
-    data (tuple): Tuple containing Y and X arrays.
-    gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
-    calculate_Ftheta (function): Function to calculate Ftheta.
-    p0 (list): List of solutions to the linear feasibility problem for each unique X value.
-    truncation_threshold (float): The value at which to truncate lnLR to ensure it stays finite.
-
-    Returns:
-    float: The calculated lnL0 value.
-    """
-    Y, X = data
-    Nx = len(p0)
-    Ny = len(gmodel.Y_nodes)
-
-    # Calculate qtheta
-    qtheta = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
-
-    # Compute log-likelihood 
-    lnL0 = np.zeros((Nx, Ny))
-    for i in range(Nx):
-          lnL0[i, :] = np.log(qtheta[i])
-          lnL0[i, :] = np.clip(lnL0[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
-
-    # Compute ccp_array, Px, and X_supp
-    _, ccp_array, Px, X_supp = calculate_ccp(Y, X, gmodel.Y_nodes)
-
-    # Compute weights w and count
-    n = len(Y)
-    w = np.repeat(Px, Ny).reshape(Nx, Ny)
-    count = n * ccp_array * w
-
-    # Calculate T
-    sumlnL0 = np.sum(lnL0 * count)
-
-    return sumlnL0
 from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
 from skopt import gp_minimize
 from skopt.space import Real
 from skopt.utils import use_named_args
 import numpy as np
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', method_L0='slsqp', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None, max_retries=3):
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differential_evolution', method_L0='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None, max_retries=3):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
     If constraints are violated, retry optimization with the same or alternative methods.
@@ -525,6 +485,9 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
                 result = minimize(objective_function_L0, thetahat1, method='SLSQP', bounds=bounds, constraints=constraints)
 
             elif method_L0 == 'bayesian':
+                # Define the space for Bayesian optimization with named dimensions
+                space = [Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))]
+
                 @use_named_args(space)
                 def bayesian_objective_function_L0(**theta):
                     theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
