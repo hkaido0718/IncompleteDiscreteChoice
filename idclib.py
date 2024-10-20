@@ -534,11 +534,14 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method='differential_ev
             def bayesian_objective_function_L0(**theta):
                 theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
                 penalty = 0
-                # Apply penalties for constraint violations
+                
+                # Apply penalties for linear constraint violations
                 if linear_constraint is not None:
-                    A, b = linear_constraint.A, linear_constraint.lb
-                    penalty += np.sum(np.maximum(np.dot(A, theta_values) - b, 0))
+                    A = linear_constraint.A
+                    lb = linear_constraint.lb
+                    penalty += np.sum(np.maximum(np.dot(A, theta_values) - lb, 0))
 
+                # Apply penalties for nonlinear constraint violations
                 if nonlinear_constraint is not None:
                     penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta_values) - nonlinear_constraint.ub, 0))
 
