@@ -247,6 +247,7 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
 def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     """
     Calculate the p0 and nutheta for each unique X value.
+    Also returns the indices where no feasible solution exists.
 
     Parameters:
     theta (np.array): Parameter vector.
@@ -255,10 +256,11 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     calculate_Ftheta (function): Function to calculate Ftheta.
 
     Returns:
-    tuple: (p_events, nutheta, p0)
+    tuple: (p_events, nutheta, p0, infeasible_indices)
     p_events (list): List of subset probabilities for each unique X value.
     nutheta (list): List of sharp lower bounds for each unique X value.
     p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+    infeasible_indices (list): List of indices where no feasible solution exists.
     """
     Y, X = data
     Y_nodes = gmodel.Y_nodes
@@ -267,9 +269,8 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     tolcon = 1e-4
 
     # Step 1: Obtain X_supp
-    _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
+    _, _, _, X_supp = calculate_ccp(Y, X, Y_nodes)
     Nx = len(X_supp)
-
 
     # Step 3: Compute Ftheta at \(\theta\)
     Nu = len(U_nodes)
@@ -280,6 +281,7 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
     # Step 4: Compute \(\nu_{\theta}\) and find p for each i
     nutheta = []
     p0 = []
+    infeasible_indices = []
     for i in range(Nx):
         results, sharp_lower_bounds = gmodel.calculate_sharp_lower_bound(Ftheta[i])
 
@@ -311,9 +313,10 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
         if res.success:
             p0.append(res.x)
         else:
+            infeasible_indices.append(i)
             print(f"No feasible solution exists for X index {i}.")
 
-    return nutheta, p0
+    return nutheta, p0, infeasible_indices
 
 def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     """
