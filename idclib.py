@@ -457,6 +457,27 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
 
     return sumlnL0
 
+def filter_data(data, infeasible_indices):
+    """
+    Filter out the data rows that correspond to infeasible indices.
+    
+    Parameters:
+    data (tuple): Tuple containing Y and X arrays.
+    infeasible_indices (list): Indices where no feasible solution exists.
+    
+    Returns:
+    tuple: Filtered data (Y_filtered, X_filtered)
+    """
+    Y, X = data
+    mask = np.ones(len(Y), dtype=bool)
+    mask[infeasible_indices] = False
+    
+    # Filter data
+    Y_filtered = Y[mask]
+    X_filtered = X[mask]
+    
+    return Y_filtered, X_filtered
+
 
 from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
 from skopt import gp_minimize
