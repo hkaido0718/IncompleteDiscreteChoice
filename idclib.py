@@ -609,13 +609,15 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
         print("Minimum Qhat:", min_Qhat)
 
         # Step 2: Calculate p0 and unrestricted log-likelihood
-        _, p0 = calculate_p0(thetahat1, data0, gmodel, calculate_Ftheta)
-        sumlnL1 = calculate_L1(data0, gmodel, p0)
+        _, p0, infeasible_indices = calculate_p0(thetahat1, data0, gmodel, calculate_Ftheta)
+        # Filter data0 using the infeasible_indices
+        filtered_data0 = filter_data(data0, infeasible_indices)
+        sumlnL1 = calculate_L1(filtered_data0, gmodel, p0)
         print("Unrestricted log-likelihood:", sumlnL1)
 
         # Step 3: Define the function to minimize for L0 (apply bounds and constraints here)
         def objective_function_L0(theta):
-            return -calculate_L0(theta, data0, gmodel, calculate_Ftheta, p0)
+            return -calculate_L0(theta, filtered_data0, gmodel, calculate_Ftheta, p0)
 
         # Optimize L0 and check constraints
         thetahat0, sumlnL0 = optimize_L0(thetahat1, objective_function_L0)
