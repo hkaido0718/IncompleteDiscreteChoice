@@ -318,9 +318,9 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
 
     return nutheta, p0, infeasible_indices
 
-def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
+def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, penalty_value=1e10):
     """
-    Calculate the qtheta for each unique X value using CVXPY.
+    Calculate the qtheta for each unique X value using CVXPY, applying a penalty for infeasible solutions and exiting early if infeasibility occurs.
 
     Parameters:
     theta (np.array): Parameter vector.
@@ -328,9 +328,10 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
     calculate_Ftheta (function): Function to calculate Ftheta.
     p0 (list): List of solutions to the linear feasibility problem for each unique X value.
+    penalty_value (float): The penalty to apply if no feasible solution is found.
 
     Returns:
-    list: qtheta for each unique X value.
+    tuple: qtheta (list) and total_penalty (float)
     """
     Y, X = data
     Y_nodes = gmodel.Y_nodes
@@ -341,7 +342,7 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
     tolcon = 1e-3
 
     # Step 1: Obtain X_supp
-    _, _, _, X_supp = calculate_ccp(Y,X,Y_nodes)
+    _, _, _, X_supp = calculate_ccp(Y, X, Y_nodes)
     Nx = len(X_supp)
 
     # Step 3: Compute Ftheta at \(\theta\)
@@ -351,6 +352,7 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
         Ftheta[i, :] = calculate_Ftheta(X_supp[i], theta)
 
     qtheta = []
+    total_penalty = 0
 
     for i in range(Nx):
         p = p0[i]
@@ -384,10 +386,20 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0):
         if prob.status == cp.OPTIMAL:
             qtheta.append(q.value)
         else:
+            # As soon as an infeasibility is detected
             print(f"No feasible solution exists for X index {i}.")
-            qtheta.append(np.zeros(Ny))
+            
+            # Set qtheta to a default value to ensure lnL0 can still be calculated
+            qtheta = [np.ones(Ny) / Ny] * Nx  # Example: uniform distribution across Y_nodes
+            
+            # Apply high penalty
+            total_penalty = penalty_value
+            
+            # Exit the loop
+            break
 
-    return qtheta
+    return qtheta, total_penalty
+
 
 def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
     """
@@ -416,9 +428,9 @@ def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
     sumlnL1 = np.sum(np.log(p0)*count)
     return sumlnL1
 
-def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10):
+def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10, penalty_value=1e10):
     """
-    Calculate the lnL0 value for the given theta.
+    Calculate the lnL0 value for the given theta, penalizing infeasible solutions and handling infeasibilities by exiting early.
 
     Parameters:
     theta (np.array): Parameter vector.
@@ -427,6 +439,7 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     calculate_Ftheta (function): Function to calculate Ftheta.
     p0 (list): List of solutions to the linear feasibility problem for each unique X value.
     truncation_threshold (float): The value at which to truncate lnLR to ensure it stays finite.
+    penalty_value (float): The penalty to apply if no feasible solution is found.
 
     Returns:
     float: The calculated lnL0 value.
@@ -435,14 +448,14 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     Nx = len(p0)
     Ny = len(gmodel.Y_nodes)
 
-    # Calculate qtheta
-    qtheta = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0)
+    # Calculate qtheta and apply penalty if needed
+    qtheta, total_penalty = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, penalty_value)
 
     # Compute log-likelihood 
     lnL0 = np.zeros((Nx, Ny))
     for i in range(Nx):
-          lnL0[i, :] = np.log(qtheta[i])
-          lnL0[i, :] = np.clip(lnL0[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
+        lnL0[i, :] = np.log(qtheta[i])
+        lnL0[i, :] = np.clip(lnL0[i, :], -truncation_threshold, truncation_threshold)  # Truncate to threshold
 
     # Compute ccp_array, Px, and X_supp
     _, ccp_array, Px, X_supp = calculate_ccp(Y, X, gmodel.Y_nodes)
@@ -452,8 +465,8 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     w = np.repeat(Px, Ny).reshape(Nx, Ny)
     count = n * ccp_array * w
 
-    # Calculate T
-    sumlnL0 = np.sum(lnL0 * count)
+    # Calculate T and apply penalty to lnL0
+    sumlnL0 = np.sum(lnL0 * count) - total_penalty  # Penalize log-likelihood if infeasibility occurred
 
     return sumlnL0
 
