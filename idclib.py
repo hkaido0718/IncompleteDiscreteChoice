@@ -5,7 +5,10 @@ import scipy
 import networkx as nx
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
-from scipy.optimize import differential_evolution, LinearConstraint, NonlinearConstraint
+from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
+from skopt import gp_minimize
+from skopt.space import Real
+from skopt.utils import use_named_args
 
 def calculate_subset_probabilities(P0, Y_nodes):
     """
@@ -492,13 +495,12 @@ def filter_data(data, infeasible_indices):
     return Y_filtered, X_filtered
 
 
-from scipy.optimize import differential_evolution, minimize, LinearConstraint, NonlinearConstraint
-from skopt import gp_minimize
-from skopt.space import Real
-from skopt.utils import use_named_args
-import numpy as np
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differential_evolution', method_L0='differential_evolution', linear_constraint=None, nonlinear_constraint=None, seed=123, split=None, max_retries=3):
+
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differential_evolution', 
+                 method_L0='differential_evolution', linear_constraint=None, 
+                 nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
+                 calculate_p0_func=calculate_p0):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
     If constraints are violated, retry optimization with the same or alternative methods.
@@ -516,6 +518,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
     seed (int, optional): Seed for the random number generator (default is 123).
     split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit.
     max_retries (int, optional): Maximum number of retries if constraints are violated.
+    calculate_p0_func (function): Optional custom function to calculate p0. Defaults to the numerical calculate_p0.
 
     Returns:
     float: The calculated T, T^swap, or T^crossfit value.
@@ -622,7 +625,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
         print("Minimum Qhat:", min_Qhat)
 
         # Step 2: Calculate p0 and unrestricted log-likelihood
-        _, p0, infeasible_indices = calculate_p0(thetahat1, data0, gmodel, calculate_Ftheta)
+        _, p0, infeasible_indices = calculate_p0_func(thetahat1, data0, gmodel, calculate_Ftheta)
         # Filter data0 using the infeasible_indices
         filtered_data0 = filter_data(data0, infeasible_indices)
         sumlnL1 = calculate_L1(filtered_data0, gmodel, p0)
