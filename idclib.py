@@ -495,7 +495,7 @@ def filter_data(data, infeasible_indices):
     return Y_filtered, X_filtered
 
 
-def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differential_evolution', 
+def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', 
                  method_L0='differential_evolution', linear_constraint=None, 
                  nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
                  calculate_p0_func=calculate_p0, thetahat1=None):
