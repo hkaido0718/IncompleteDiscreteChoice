@@ -495,15 +495,14 @@ def filter_data(data, infeasible_indices):
     return Y_filtered, X_filtered
 
 
-
-
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differential_evolution', 
                  method_L0='differential_evolution', linear_constraint=None, 
                  nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
-                 calculate_p0_func=calculate_p0):
+                 calculate_p0_func=calculate_p0, thetahat1=None):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
     If constraints are violated, retry optimization with the same or alternative methods.
+    Optionally, use an initial estimator thetahat1 directly if provided, skipping Qhat optimization.
 
     Parameters:
     data (list): List containing Y and X arrays.
@@ -519,6 +518,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
     split (str, optional): If "swap", swap the roles of data0 and data1; if "crossfit", calculate T and T^swap and return T^crossfit.
     max_retries (int, optional): Maximum number of retries if constraints are violated.
     calculate_p0_func (function): Optional custom function to calculate p0. Defaults to the numerical calculate_p0.
+    thetahat1 (np.array, optional): Initial estimator for theta. If provided, skips Qhat optimization.
 
     Returns:
     float: The calculated T, T^swap, or T^crossfit value.
@@ -600,32 +600,37 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
         raise ValueError("Optimization failed to satisfy constraints after maximum retries.")
 
     def calculate_single_T(data0, data1, label):
-        # Step 1: Define the function to minimize for Qhat (only bounds apply here)
-        def objective_function_Qhat(theta):
-            return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
+        # Step 1: If thetahat1 is not provided, define the function to minimize for Qhat
+        if thetahat1 is None:
+            def objective_function_Qhat(theta):
+                return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
 
-        # Optimizing Qhat
-        if method_Qhat == 'differential_evolution':
-            result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
+            # Optimizing Qhat
+            if method_Qhat == 'differential_evolution':
+                result = differential_evolution(objective_function_Qhat, bounds, seed=seed)
 
-        elif method_Qhat == 'bayesian':
-            # Define the space for Bayesian optimization with named dimensions
-            space = [Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))]
+            elif method_Qhat == 'bayesian':
+                # Define the space for Bayesian optimization with named dimensions
+                space = [Real(low, high, name=f'theta_{i}') for i, (low, high) in enumerate(zip(LB, UB))]
 
-            @use_named_args(space)
-            def bayesian_objective_function_Qhat(**theta):
-                theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
-                return objective_function_Qhat(theta_values)
+                @use_named_args(space)
+                def bayesian_objective_function_Qhat(**theta):
+                    theta_values = np.array([theta[f'theta_{i}'] for i in range(len(LB))])
+                    return objective_function_Qhat(theta_values)
 
-            result = gp_minimize(bayesian_objective_function_Qhat, space, random_state=seed)
+                result = gp_minimize(bayesian_objective_function_Qhat, space, random_state=seed)
 
-        thetahat1 = result.x
-        min_Qhat = result.fun
-        print(f"Initial Estimator{label}:", thetahat1)
-        print("Minimum Qhat:", min_Qhat)
+            thetahat1_used = result.x
+            min_Qhat = result.fun
+            print(f"Initial Estimator{label}:", thetahat1_used)
+            print("Minimum Qhat:", min_Qhat)
+        else:
+            # Use the provided initial estimator thetahat1 directly
+            thetahat1_used = thetahat1
+            print(f"Using provided initial estimator{label}:", thetahat1_used)
 
         # Step 2: Calculate p0 and unrestricted log-likelihood
-        _, p0, infeasible_indices = calculate_p0_func(thetahat1, data0, gmodel, calculate_Ftheta)
+        _, p0, infeasible_indices = calculate_p0_func(thetahat1_used, data0, gmodel, calculate_Ftheta)
         # Filter data0 using the infeasible_indices
         filtered_data0 = filter_data(data0, infeasible_indices)
         sumlnL1 = calculate_L1(filtered_data0, gmodel, p0)
@@ -636,7 +641,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='differenti
             return -calculate_L0(theta, filtered_data0, gmodel, calculate_Ftheta, p0)
 
         # Optimize L0 and check constraints
-        thetahat0, sumlnL0 = optimize_L0(thetahat1, objective_function_L0)
+        thetahat0, sumlnL0 = optimize_L0(thetahat1_used, objective_function_L0)
 
         print(f"RMLE{label}:", thetahat0)
         print("Restricted log-likelihood:", sumlnL0)
