@@ -25,3 +25,7 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
   - [`Ex_OrderedChoice.ipynb`](./Ex_OrderedChoice.ipynb): Ordered choice with a set-valued control function
   - [`Ex_HeterogeneousChoiceSets.ipynb`](./Ex_HeterogeneousChoiceSets.ipynb): Multinomial choice with heterogeneous choice sets
   - [`Ex_BinaryResponseIV.ipynb'](./Ex_BinaryResponseIV.ipynb): Binary response model with IVs
+
+# Funding
+
+The development of the library is supported by NSF Grant (SES-2018498)
