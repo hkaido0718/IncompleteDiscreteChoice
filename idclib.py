@@ -440,7 +440,7 @@ def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
     sumlnL1 = np.sum(np.log(p0)*count)
     return sumlnL1
 
-def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10, penalty_value=1e10):
+def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10, penalty_value=1e10, qtheta_function=None):
     """
     Calculate the lnL0 value for the given theta, penalizing infeasible solutions and handling infeasibilities by exiting early.
 
@@ -460,9 +460,12 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
     Nx = len(p0)
     Ny = len(gmodel.Y_nodes)
 
-    # Calculate qtheta and apply penalty if needed
-    qtheta, total_penalty = calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, penalty_value)
-
+    # Calculate qtheta with analytical option
+    qtheta, total_penalty = calculate_qtheta(
+        theta, data, gmodel, calculate_Ftheta, p0, 
+        penalty_value=penalty_value, qtheta_function=qtheta_function
+    )
+    
     # Compute log-likelihood 
     lnL0 = np.zeros((Nx, Ny))
     for i in range(Nx):
