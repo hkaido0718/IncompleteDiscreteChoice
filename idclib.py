@@ -321,17 +321,21 @@ def calculate_p0(theta, data, gmodel, calculate_Ftheta):
 
     return nutheta, p0, infeasible_indices
 
-def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, penalty_value=1e10):
+def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, 
+                     penalty_value=1e10, qtheta_function=None):
     """
-    Calculate the qtheta for each unique X value using CVXPY, applying a penalty for infeasible solutions and exiting early if infeasibility occurs.
-
+    Calculate qtheta for each unique X value using either:
+      1. Analytical method (user-provided function).
+      2. Numerical optimization (default).
+      
     Parameters:
     theta (np.array): Parameter vector.
     data (tuple): Tuple containing Y and X arrays.
     gmodel (BipartiteGraph): Instance of the BipartiteGraph class.
     calculate_Ftheta (function): Function to calculate Ftheta.
     p0 (list): List of solutions to the linear feasibility problem for each unique X value.
-    penalty_value (float): The penalty to apply if no feasible solution is found.
+    penalty_value (float): Penalty applied if no feasible solution is found.
+    qtheta_function (function, optional): User-provided function for analytical calculation of qtheta.
 
     Returns:
     tuple: qtheta (list) and total_penalty (float)
@@ -357,49 +361,54 @@ def calculate_qtheta(theta, data, gmodel, calculate_Ftheta, p0, penalty_value=1e
     qtheta = []
     total_penalty = 0
 
-    for i in range(Nx):
-        p = p0[i]
+    # Step 4: Use analytical function if provided
+    if qtheta_function:
+        for i in range(Nx):
+            p = p0[i]
+            try:
+                qtheta.append(qtheta_function(Ftheta[i, :], p))  # Analytical computation
+            except Exception as e:
+                print(f"Error in analytical qtheta computation at index {i}: {e}")
+                qtheta.append(np.ones(Ny) / Ny)  # Fallback: uniform distribution
+                total_penalty += penalty_value
+    else:
+        # Default numerical optimization
+        for i in range(Nx):
+            p = p0[i]
 
-        # Setup constraints
-        results, _ = gmodel.calculate_sharp_lower_bound(Ftheta[i])
-        filtered_results = [result for result in results if result[1]]
-        num_rows = len(filtered_results)
-        A = np.zeros((num_rows, Ny), dtype=int)
-        b = np.zeros(num_rows)
+            # Setup constraints
+            results, _ = gmodel.calculate_sharp_lower_bound(Ftheta[i])
+            filtered_results = [result for result in results if result[1]]
+            num_rows = len(filtered_results)
+            A = np.zeros((num_rows, Ny), dtype=int)
+            b = np.zeros(num_rows)
 
-        for j, (subset_set, exclusive_u_nodes, total_prob) in enumerate(filtered_results):
-            for k, y_node in enumerate(Y_nodes):
-                if y_node in subset_set:
-                    A[j, k] = 1
-            b[j] = total_prob - tolcon
+            for j, (subset_set, exclusive_u_nodes, total_prob) in enumerate(filtered_results):
+                for k, y_node in enumerate(Y_nodes):
+                    if y_node in subset_set:
+                        A[j, k] = 1
+                b[j] = total_prob - tolcon
 
-        # Define the optimization variables and constraints
-        q = cp.Variable(Ny)
-        constraints = [q >= tolcon, q <= 1-tolcon, cp.sum(q) == 1]  # Probability simplex and bounds constraints
-        for j in range(num_rows):
-            constraints.append(A[j, :] @ q >= b[j])
+            # Define the optimization variables and constraints
+            q = cp.Variable(Ny)
+            constraints = [q >= tolcon, q <= 1-tolcon, cp.sum(q) == 1]  # Probability simplex and bounds constraints
+            for j in range(num_rows):
+                constraints.append(A[j, :] @ q >= b[j])
 
-        # Define the objective function
-        objective = cp.Minimize(cp.sum(cp.rel_entr(q + p, q)))
+            # Define the objective function
+            objective = cp.Minimize(cp.sum(cp.rel_entr(q + p, q)))
 
-        # Solve the optimization problem
-        prob = cp.Problem(objective, constraints)
-        prob.solve()
+            # Solve the optimization problem
+            prob = cp.Problem(objective, constraints)
+            prob.solve()
 
-        if prob.status == cp.OPTIMAL:
-            qtheta.append(q.value)
-        else:
-            # As soon as an infeasibility is detected
-            print(f"No feasible solution exists for X index {i}.")
-            
-            # Set qtheta to a default value to ensure lnL0 can still be calculated
-            qtheta = [np.ones(Ny) / Ny] * Nx  # Example: uniform distribution across Y_nodes
-            
-            # Apply high penalty
-            total_penalty = penalty_value
-            
-            # Exit the loop
-            break
+            if prob.status == cp.OPTIMAL:
+                qtheta.append(q.value)
+            else:
+                print(f"No feasible solution exists for X index {i}.")
+                qtheta = [np.ones(Ny) / Ny] * Nx  # Default to uniform distribution
+                total_penalty = penalty_value
+                break
 
     return qtheta, total_penalty
 
