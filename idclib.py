@@ -465,7 +465,7 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
         theta, data, gmodel, calculate_Ftheta, p0, 
         penalty_value=penalty_value, qtheta_function=qtheta_function
     )
-    
+
     # Compute log-likelihood 
     lnL0 = np.zeros((Nx, Ny))
     for i in range(Nx):
@@ -510,7 +510,7 @@ def filter_data(data, infeasible_indices):
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', 
                  method_L0='differential_evolution', linear_constraint=None, 
                  nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
-                 calculate_p0_func=calculate_p0, thetahat1=None):
+                 calculate_p0_func=calculate_p0, thetahat1=None, qtheta_function=None):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
     If constraints are violated, retry optimization with the same or alternative methods.
@@ -648,9 +648,12 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
         sumlnL1 = calculate_L1(filtered_data0, gmodel, p0)
         print("Unrestricted log-likelihood:", sumlnL1)
 
-        # Step 3: Define the function to minimize for L0 (apply bounds and constraints here)
+        # Step 3: Optimize L0 using analytical or numerical qtheta
         def objective_function_L0(theta):
-            return -calculate_L0(theta, filtered_data0, gmodel, calculate_Ftheta, p0)
+            return -calculate_L0(
+                theta, filtered_data0, gmodel, calculate_Ftheta, p0, 
+                qtheta_function=qtheta_function
+            )
 
         # Optimize L0 and check constraints
         thetahat0, sumlnL0 = optimize_L0(thetahat1_used, objective_function_L0)
