@@ -201,7 +201,7 @@ def print_table(results):
     for subset_set, exclusive_u_nodes, total_prob in filtered_results:
         print(f"{str(subset_set):<{subset_width + column_spacing}} {str(exclusive_u_nodes):<{exclusive_width + column_spacing}} {total_prob:<{lower_bound_width + column_spacing}.3f}")
 
-def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
+def calculate_Qhat(theta, data, gmodel, calculate_Ftheta, tol=1e-6):
     Y, X = data
     n = Y.shape[0]
     Y_nodes = gmodel.Y_nodes
@@ -225,6 +225,11 @@ def calculate_Qhat(theta, data, gmodel, calculate_Ftheta):
 
     with ThreadPoolExecutor() as executor:
         Ftheta = np.array(list(executor.map(compute_Ftheta, range(Nx))))
+
+        # Check if any component of Ftheta is below the threshold
+    if np.any(Ftheta < tol):
+        print(f"Constraint violated: Ftheta values below {tol}. Applying penalty.")
+        return 1e10  # Large penalty for violation
 
     # Step 4: Compute \(\nu_{\theta}\)
     def compute_nutheta(i):
@@ -440,7 +445,7 @@ def calculate_L1(data,gmodel, p0, truncation_threshold=1e10):
     sumlnL1 = np.sum(np.log(p0)*count)
     return sumlnL1
 
-def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10, penalty_value=1e10, qtheta_function=None):
+def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold=1e10, penalty_value=1e10, qtheta_function=None, tol=1e-6):
     """
     Calculate the lnL0 value for the given theta, penalizing infeasible solutions and handling infeasibilities by exiting early.
 
@@ -465,6 +470,13 @@ def calculate_L0(theta, data, gmodel, calculate_Ftheta, p0, truncation_threshold
         theta, data, gmodel, calculate_Ftheta, p0, 
         penalty_value=penalty_value, qtheta_function=qtheta_function
     )
+
+    # Penalize for Ftheta violations
+    _, _, _, X_supp = calculate_ccp(Y, X, gmodel.Y_nodes)
+    Ftheta = np.array([calculate_Ftheta(x, theta) for x in X_supp])
+    if np.any(Ftheta < tol):
+        print(f"Ftheta has values below threshold {tol}. Adding penalty.")
+        total_penalty += penalty_value
 
     # Compute log-likelihood 
     lnL0 = np.zeros((Nx, Ny))
@@ -507,10 +519,11 @@ def filter_data(data, infeasible_indices):
     return Y_filtered, X_filtered
 
 
+
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', 
                  method_L0='differential_evolution', linear_constraint=None, 
                  nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
-                 calculate_p0_func=calculate_p0, thetahat1=None, qtheta_function=None):
+                 calculate_p0_func=calculate_p0, thetahat1=None, qtheta_function=None, tol=1e-6):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
     If constraints are violated, retry optimization with the same or alternative methods.
@@ -615,7 +628,7 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
         # Step 1: If thetahat1 is not provided, define the function to minimize for Qhat
         if thetahat1 is None:
             def objective_function_Qhat(theta):
-                return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta)
+                return calculate_Qhat(theta, data1, gmodel, calculate_Ftheta, tol)
 
             # Optimizing Qhat
             if method_Qhat == 'differential_evolution':
