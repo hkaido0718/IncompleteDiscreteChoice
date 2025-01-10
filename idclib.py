@@ -576,26 +576,63 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
         """Optimize L0 with retries if constraints are violated."""
         retries = 0
         while retries < max_retries:
-            # Optimizing L0
-            if method_L0 == 'differential_evolution':
-                # Constraints and bounds applied during L0 optimization with differential evolution
-                constraints = []
-                if linear_constraint is not None:
-                    constraints.append(linear_constraint)
-                if nonlinear_constraint is not None:
-                    constraints.append(nonlinear_constraint)
+            _, _, _, X_supp = calculate_ccp(data[0], data[1], gmodel.Y_nodes)
+            enforce_Ftheta_constraint = NonlinearConstraint(
+            lambda theta: enforce_Ftheta_bounds(theta, X_supp, calculate_Ftheta, tol),
+            lb=0,  # Ftheta - tol >= 0
+            ub=np.inf  # No upper bound
+            )
 
-                result = differential_evolution(objective_function_L0, bounds, constraints=constraints, seed=seed)
+            constraints = [enforce_Ftheta_constraint]  # Always include enforce_Ftheta_constraint
+        
+            # Add linear constraint if provided
+            if linear_constraint is not None:
+                constraints.append(linear_constraint)
+
+            # Add nonlinear constraint if provided
+            if nonlinear_constraint is not None:
+                constraints.append(nonlinear_constraint)
+
+            # Optimization using differential evolution
+            if method_L0 == 'differential_evolution':
+                result = differential_evolution(
+                    objective_function_L0, 
+                    bounds, 
+                    constraints=constraints, 
+                    seed=seed
+                )
 
             elif method_L0 == 'slsqp':
-                # Use SLSQP for L0 optimization
-                constraints = []
+                # Convert constraints for SLSQP
+                slsqp_constraints = []
+                
+                # Linear constraint for SLSQP
                 if linear_constraint is not None:
-                    constraints.append({'type': 'ineq', 'fun': lambda x: np.dot(linear_constraint.A, x) - linear_constraint.lb})
-                if nonlinear_constraint is not None:
-                    constraints.append({'type': 'ineq', 'fun': nonlinear_constraint.fun})
+                    slsqp_constraints.append({
+                        'type': 'ineq',
+                        'fun': lambda x: np.dot(linear_constraint.A, x) - linear_constraint.lb
+                    })
 
-                result = minimize(objective_function_L0, thetahat1, method='SLSQP', bounds=bounds, constraints=constraints)
+                # Nonlinear constraint for SLSQP
+                if nonlinear_constraint is not None:
+                    slsqp_constraints.append({
+                        'type': 'ineq',
+                        'fun': nonlinear_constraint.fun
+                    })
+
+                # Add enforce_Ftheta_constraint for SLSQP
+                slsqp_constraints.append({
+                    'type': 'ineq',
+                    'fun': lambda x: enforce_Ftheta_constraint.fun(x)
+                })
+
+                result = minimize(
+                    objective_function_L0, 
+                    thetahat1, 
+                    method='SLSQP', 
+                    bounds=bounds, 
+                    constraints=slsqp_constraints
+                )
 
             elif method_L0 == 'bayesian':
                 # Define the space for Bayesian optimization with named dimensions
@@ -615,6 +652,10 @@ def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian',
                     # Apply penalties for nonlinear constraint violations
                     if nonlinear_constraint is not None:
                         penalty += np.sum(np.maximum(nonlinear_constraint.fun(theta_values) - nonlinear_constraint.ub, 0))
+
+                    # Apply penalties for enforce_Ftheta_constraint
+                    if np.any(enforce_Ftheta_constraint.fun(theta_values) < enforce_Ftheta_constraint.lb):
+                        penalty += 1e10
 
                     return objective_function_L0(theta_values) + penalty
 
