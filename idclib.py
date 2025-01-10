@@ -519,6 +519,13 @@ def filter_data(data, infeasible_indices):
     return Y_filtered, X_filtered
 
 
+def enforce_Ftheta_bounds(theta, X_supp, calculate_Ftheta, tol):
+    """
+    Enforce Ftheta > tol for all components based on the given theta.
+    """
+    Ftheta = np.array([calculate_Ftheta(x, theta) for x in X_supp])
+    return np.min(Ftheta) - tol
+
 
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', 
                  method_L0='differential_evolution', linear_constraint=None, 
