@@ -529,7 +529,7 @@ def enforce_Ftheta_bounds(theta, X_supp, calculate_Ftheta, tol):
 
 def calculate_LR(data, gmodel, calculate_Ftheta, LB, UB, method_Qhat='bayesian', 
                  method_L0='differential_evolution', linear_constraint=None, 
-                 nonlinear_constraint=None, seed=123, split=None, max_retries=3, 
+                 nonlinear_constraint=None, seed=123, split=None, max_retries=5, 
                  calculate_p0_func=calculate_p0, thetahat1=None, qtheta_function=None, tol=1e-6):
     """
     Calculate the T value for the given parameters using separate methods for optimizing Qhat and L0.
