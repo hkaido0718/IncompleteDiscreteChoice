@@ -10,6 +10,7 @@ This is a Python library containing programs to estimate incomplete discrete cho
 Depending on your environment, you may need to install the following modules.
 - CVXPY (https://www.cvxpy.org/install/): A module for convex optimization. Installation: `pip install cvxpy`
 - gdown (https://pypi.org/project/gdown/): A module for downloading files from Google Drive. This module is used only in the Jupyter Notebooks. Installation: `pip install gdown`
+- scikit-optimize (https://scikit-optimize.github.io/stable/): A module for optimizing objective functions (used for likelihood-based inference). Installation: `pip install scikit-optimize`
 
 # Tutorials
 
