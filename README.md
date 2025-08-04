@@ -25,7 +25,7 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
   - [`Ex_Panel.ipynb`](./Ex_Panel.ipynb): Panel binary choice model
   - [`Ex_OrderedChoice.ipynb`](./Ex_OrderedChoice.ipynb): Ordered choice with a set-valued control function
   - [`Ex_HeterogeneousChoiceSets.ipynb`](./Ex_HeterogeneousChoiceSets.ipynb): Multinomial choice with heterogeneous choice sets
-  - [`Ex_BinaryResponseIV.ipynb'](./Ex_BinaryResponseIV.ipynb): Binary response model with IVs
+  - [`Ex_BinaryResponseIV.ipynb`](./Ex_BinaryResponseIV.ipynb): Binary response model with IVs
 
 # Funding
 
