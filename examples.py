@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.stats import mvn
-from scipy.stats import multivariate_normal
+#from scipy.stats import mvn
+from scipy.stats import multivariate_normal 
 from numba import njit, prange
 
 def calculate_Ftheta_entrygame(X, theta):
@@ -14,7 +14,8 @@ def calculate_Ftheta_entrygame(X, theta):
         """ Compute the probability for the bivariate normal distribution. """
         lower = np.array(lower)
         upper = np.array(upper)
-        p, _ = mvn.mvnun(lower, upper, mean, cov)  # compute MVN prob of a rectangle
+        # p, _ = mvn.mvnun(lower, upper, mean, cov)  # compute MVN prob of a rectangle
+        p = multivariate_normal(mean=mean, cov=cov).cdf(upper, lower_limit=lower) # compute MVN prob of a rectangle
         return p
 
     # Extract X values
