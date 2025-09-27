@@ -123,7 +123,7 @@ class BipartiteGraph:
     def __init__(self, Y_nodes, U_nodes, edges):
         self.Y_nodes = Y_nodes
         self.U_nodes = U_nodes
-        self.B = nx.DiGraph()
+        self.B = nx.Graph()
         self.B.add_nodes_from(Y_nodes, bipartite=0)  # Add Y-nodes with bipartite attribute
         self.B.add_nodes_from(U_nodes, bipartite=1)  # Add U-nodes with bipartite attribute
         self.B.add_edges_from(edges)  # Add directed edges
