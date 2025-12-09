@@ -29,4 +29,4 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
 
 # Funding
 
-The development of the library is supported by NSF Grant (SES-2018498)
+The development of the library is supported by NSF Grants SES-2018498 and SES-2520365.
