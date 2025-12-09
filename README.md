@@ -1,6 +1,6 @@
 # A Python Library for Incomplete Discrete Choice (IDC) Models
 
-This is a Python library containing programs to estimate incomplete discrete choice models. Currently, it contains the following files.
+This is a Python library containing programs to estimate incomplete discrete choice models. The library allows the researcher to represent a model by a graph and derive sharp identifying restrictions. Currently, it contains the following files.
 
 - `idclib.py`: The main library
 - `examples.py`: Additional files for the examples used in the Jupyter notebooks.
@@ -18,7 +18,7 @@ The following Jupyter Notebooks (developed using Google Colab) review the basics
 - [`CompleteModel.ipynb`](./CompleteModel.ipynb): A review of a binary choice model;
 - [`IncompleteModel.ipynb`](./IncompleteModel.ipynb): A review of a two-player discrete game;
 - [`ModelPrediction.ipynb`](./ModelPrediction.ipynb): Explains how to represent a DC model as a graph;
-- [`Inequalities.ipynb`](./Inequalities.ipynb): Explains how to obtain the sharp identifying restrictions using the `idc` library;
+- [`Inequalities.ipynb`](./Inequalities.ipynb): Explains how to obtain the __sharp identifying restrictions__ using the `idc` library;
 - [`IdentifiedSet.ipynb`](./IdentifiedSet.ipynb): Illustrates how to compute the projections of a sharp identified set;
 - [`HypothesisTests.ipynb`](./HypothesisTests.ipynb): Explains how to conduct hypothesis tests using universal inference methods.
 - Additional examples
