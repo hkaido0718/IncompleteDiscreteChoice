@@ -1,0 +1,198 @@
+import networkx as nx
+from threading import Thread
+from collections import defaultdict
+from itertools import chain
+
+# Helper functions
+def apply_dict(v, d):
+    if isinstance(v, list) and all(isinstance(i, list) for i in v):
+        return [apply_dict(e, d) for e in v]
+    elif isinstance(v, set) and all(isinstance(i, list) for i in v):
+        return {apply_dict(e, d) for e in v}
+    else:
+        return [d[e] for e in v]
+
+# Main functions
+def G(S, B):
+    res = sorted(set(B.neighbors(S)))
+    return res
+
+def G_inv(A, B):
+    if isinstance(A, int):
+        A = [A]
+    res = sorted(set(chain.from_iterable(B.neighbors(u) for u in A)))
+    return res
+
+def G_min(A, B, Y, U):
+    G_inv_c = G_inv(set(Y) - set(A), B)
+    res = sorted(set(U) - set(G_inv_c))
+    return res
+
+def check_connectivity_complement(A, B, Y):
+    A_c = set(Y) - set(A)
+    G_inv_c = G_inv(A_c, B)
+    subgraph_nodes = list(A_c) + list(G_inv_c)
+    # NetworkX defines connectivity only for non-empty graphs; in our usage,
+    # an empty induced subgraph (e.g. when A == Y) is treated as connected.
+    sub = B.subgraph(subgraph_nodes)
+    if len(sub) == 0:
+        return True
+    return nx.is_connected(sub)
+
+def check_connectivity_self(A, B, Y, U):
+    G_min_set = G_min(A, B, Y, U)
+    subgraph_nodes = list(A) + list(G_min_set)
+    sub = B.subgraph(subgraph_nodes)
+    if len(sub) == 0:
+        return False
+    return nx.is_connected(sub) and len(G_min_set) > 0
+
+def check_connectivity_both(A, B, Y, U):
+    A_c = set(Y) - set(A)
+    G_inv_c = G_inv(A_c, B)
+    G_min_set = G_min(A, B, Y, U)
+    sub1 = B.subgraph(list(A) + list(G_min_set))
+    sub2 = B.subgraph(list(A_c) + list(G_inv_c))
+    res1 = (len(sub1) > 0) and nx.is_connected(sub1) and len(G_min_set) > 0
+    res2 = True if len(sub2) == 0 else nx.is_connected(sub2)
+    return res1 and res2
+
+def get_unions(A, list_of_comps, Y):
+    K = len(list_of_comps)
+    Y_list = [[v for v in C if v in Y] for C in list_of_comps]
+    res = [sorted(set(A) | set(chain.from_iterable(Y_list[i] for i in range(K) if i != k))) for k in range(K)]
+    return res
+
+def kids(A, B, Y, U):
+    UA = set(G_inv(A, B)) - set(G_min(A, B, Y, U))
+    C = [sorted(set(A) | set(G(u, B))) for u in UA]
+    return C
+
+def min_nr_supersets(A, B, Y, U):
+    A = list(A)
+    C_list = kids(A, B, Y, U)
+
+    CC_list = []
+    for C in C_list:
+        C_c = set(Y) - set(C)
+        G_inv_c = G_inv(C_c, B)
+
+        B_sub = B.subgraph(list(C_c) + list(G_inv_c)).copy()
+        list_of_comps_sub = [list(comp) for comp in nx.connected_components(B_sub)]
+
+        if len(list_of_comps_sub) == 1:
+            CC_list.append(C)
+        else:
+            CC_list.extend(get_unions(C, list_of_comps_sub, Y))
+    return set(tuple(c) for c in CC_list)
+
+def get_nr_sets_iteration(Q, R, B, Y, U):
+    Q_new = set()
+    R_new = set(R)
+
+    def worker(A):
+        supsets = min_nr_supersets(A, B, Y, U)
+        to_add = supsets - R
+
+        if to_add:
+            for A in to_add:
+                Q_new.add(tuple(A))
+                R_new.add(A)
+
+    threads = [Thread(target=worker, args=(A,)) for A in Q]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    if not Q_new:
+        return set(), R_new
+    return Q_new, R_new
+
+def get_nr_sets(B, Y, U):
+    Q = set()
+    A_list = [G(u, B) for u in U]
+    to_keep = [check_connectivity_complement(A, B, Y) for A in A_list]
+    R = {tuple(A_list[i]) for i in range(len(A_list)) if to_keep[i]}
+
+    for A in A_list:
+        Q.add(tuple(A))
+
+    while Q:
+        Q, R = get_nr_sets_iteration(Q, R, B, Y, U)
+    res = R - {tuple(Y)}
+    return res
+
+def smallest_CDC(B):
+    """Return the smallest core-determining class (CDC) for bipartite graph ``B``.
+
+    The graph ``B`` must be an undirected bipartite graph with a node attribute
+    ``'type'``:
+
+      * ``type == 0`` for outcome vertices (Y)
+      * ``type == 1`` for support/latent vertices (U)
+
+    The output is a set of tuples, where each tuple is a (sorted) subset of the
+    outcome vertices **in the original labeling of** ``B``.
+
+    Notes
+    -----
+    * If ``B`` is connected, the CDC consists of all critical sets.
+    * If ``B`` is disconnected, the CDC additionally contains the implicit-equality
+      sets given by the Y-vertex sets of each connected component. (One of these
+      is redundant given that probabilities sum to one, but we keep all of them.)
+
+    This function previously assumed that each connected component was already
+    labeled consecutively (so that an internal relabeling step was effectively
+    the identity). The implementation below explicitly relabels each component
+    before calling ``get_nr_sets`` and maps the resulting CDC elements back to
+    the original node labels.
+    """
+
+    CDC = set()
+
+    # Connected components of the full bipartite graph
+    # Connected components of the full bipartite graph.
+    # NOTE: We keep singleton components. In applications, a singleton
+    # outcome vertex (a Y-node with no incident edges) corresponds to an
+    # outcome that is never selected by the random set and must have
+    # probability zero in the core.
+    comps = [list(comp) for comp in nx.connected_components(B)]
+
+    # Add implicit-equality sets (Y-part of each connected component)
+    if len(comps) > 1:
+        for C in comps:
+            y_part = tuple(sorted(v for v in C if B.nodes[v].get('type') == 0))
+            if y_part:
+                CDC.add(y_part)
+
+    # Within each component, compute the critical sets using Algorithm 3
+    for C in comps:
+        YC = sorted(v for v in C if B.nodes[v].get('type') == 0)
+        UC = sorted(v for v in C if B.nodes[v].get('type') == 1)
+
+        if not YC or not UC:
+            # Degenerate component (no outcomes or no support vertices)
+            continue
+
+        # Relabel nodes inside the component to a consecutive numbering:
+        #   Y -> 1..|Y|
+        #   U -> |Y|+1..|Y|+|U|
+        label_dict_Y = {y: i + 1 for i, y in enumerate(YC)}
+        label_dict_U = {u: len(YC) + i + 1 for i, u in enumerate(UC)}
+        label_dict = {**label_dict_Y, **label_dict_U}
+        inv_label_dict = {v: k for k, v in label_dict.items()}
+
+        C_graph = nx.relabel_nodes(B.subgraph(C).copy(), label_dict, copy=True)
+        Y_renamed = list(range(1, len(YC) + 1))
+        U_renamed = list(range(len(YC) + 1, len(YC) + len(UC) + 1))
+
+        add = get_nr_sets(C_graph, Y_renamed, U_renamed)
+
+        for a in add:
+            # Map back to original Y labels and store as sorted tuple
+            orig = tuple(sorted(inv_label_dict[int(v)] for v in a))
+            if orig:
+                CDC.add(orig)
+
+    return CDC
